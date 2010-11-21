@@ -1,0 +1,1 @@
+Fixing a traceback during quota checking when a file goes away.

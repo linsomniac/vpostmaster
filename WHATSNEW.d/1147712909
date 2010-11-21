@@ -1,0 +1,2 @@
+Database connection failure now writes an easier to understand error.
+      Reported by Eduardo Reitz

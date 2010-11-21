@@ -1,0 +1,4 @@
+Make it so that a domain profile can be applied to all or specified users
+of the domain.  Also make it so that the sytsem defaults could be applied
+to some or all domains, and possibly all (or some?) users in those domains.
+

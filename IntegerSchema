@@ -1,0 +1,16 @@
+alter table domaindefaults add column newdomainsid integer;
+update domaindefaults set newdomainsid = domainsid::integer;
+
+
+
+#  This doesn't work.
+alter table domaindefaults drop constraint "$1";
+altertable domaindefaults rename domainsid to oldomainsid;
+alter table domaindefaults rename newdomainsid to domainsid;
+
+ALTER TABLE ONLY domaindefaults
+    ADD CONSTRAINT domaindefaults_domainsid_key UNIQUE (domainsid, "key");
+ALTER TABLE ONLY domaindefaults
+    ADD CONSTRAINT "$1" FOREIGN KEY (domainsid) REFERENCES domains(id) ON
+    UPDATE
+     CASCADE ON DELETE CASCADE;

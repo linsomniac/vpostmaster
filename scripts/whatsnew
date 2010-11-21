@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+#  Add a WHATSNEW entry.
+
+FILENAME=WHATSNEW.d/`date +%s`
+
+touch "$FILENAME"
+svn add "$FILENAME"
+
+echo -n "Is this to be marker for a version release? [y/N] "
+read line
+MESSAGE='New WHATSNEW entry.'
+if [ "$line" = y ]
+then
+   grep '^Version ' WHATSNEW.d/* | tail -1
+   echo -n 'What version? '
+   read VERSION
+   echo >>"$FILENAME"
+   echo ================================ >>"$FILENAME"
+   echo Version $VERSION -- `date '+%a %b %d, %Y'` >>"$FILENAME"
+   echo >>"$FILENAME"
+   MESSAGE="WHATSNEW entry for version $VERSION."
+fi
+$EDITOR "$FILENAME"
+
+echo -n 'Commit file? [Y/n] '
+read line
+[ "$line" = n ] && exit 0
+svn commit -m "" "$FILENAME"

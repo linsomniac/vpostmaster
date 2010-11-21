@@ -1,0 +1,9 @@
+Jason from Egyptian would like a button on the domain defaults screen that
+would do:
+
+"Reset all users to default"
+
+So, if you had say greylisting set in the defaults and made 20 users,
+then wanted to disable it in the entire domain you could change the
+default and hit the 'reset all users to default'.
+

@@ -1,0 +1,2 @@
+Changing wwwdb.conf in RPM spec file to be owned by vpostmaster instead of
+      root.  Reported by Raul A. Gallegos.

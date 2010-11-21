@@ -1,0 +1,2 @@
+Added a backup script that runs every hour from cron to store the database
+      and configuration files in /var/spool/vpostmaster

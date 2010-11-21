@@ -1,0 +1,637 @@
+#!/bin/bash
+#
+# (c) 2005 tummy.com, ltd.
+#
+#  Set up vPostMaster on the system, including the database and config
+#  files.
+
+PATH=$PATH:/usr/sbin:/sbin
+
+
+#  create passwords
+function genpasswd {
+	head -c 32 /dev/urandom | md5sum | awk '{ print $1 }'
+}
+function cryptpasswd {
+	python -c "import crypt; print crypt.crypt('$1', '$2')"
+}
+function bkup {
+	[ -f "$1" -a ! -f "$1".vpostmaster ] && cp "$1" "$1".vpostmaster
+}
+PASSWORD_POSTFIX=`genpasswd`
+PASSWORD_VPOSTMASTER=`genpasswd`
+PASSWORD_VPOSTMASTERWWW=`genpasswd`
+PASSWORD_IMAPSERVER=`genpasswd`
+PASSWORD_SUPERUSER=`genpasswd | cut -c 1-8`
+SALT=`genpasswd | cut -c 1-2`
+CRYPTED_SUPERUSER=`cryptpasswd "$PASSWORD_SUPERUSER" "$SALT"`
+
+#  move wwwdb.conf out of the way if it's the distribution copy
+head -1 /usr/lib/vpostmaster/etc/wwwdb.conf 2>/dev/null \
+		| grep -q "password=secret" \
+		&& mv /usr/lib/vpostmaster/etc/wwwdb.conf \
+			/usr/lib/vpostmaster/etc/wwwdb.conf.orig
+
+# read old passwords if set
+if [ -f /usr/lib/vpostmaster/etc/wwwdb.conf ]
+then
+	PASSWORD_VPOSTMASTERWWW=`awk -F '=' '/^dbname/ { print $5 }' \
+			/usr/lib/vpostmaster/etc/wwwdb.conf`
+fi
+if [ -f /usr/lib/vpostmaster/etc/vpostmaster-db.conf ]
+then
+	PASSWORD_VPOSTMASTER=`awk -F '=' '/^dbname/ { print $5 }' \
+			/usr/lib/vpostmaster/etc/vpostmaster-db.conf`
+fi
+
+#  write passwords
+(  # run following commands in umasked subshell for added password security
+	umask 077
+	if [ ! -f /usr/lib/vpostmaster/etc/wwwdb.conf ]
+	then
+		echo "dbname=vpostmaster host=127.0.0.1 user=vpostmasterwww" \
+				"password=${PASSWORD_VPOSTMASTERWWW}" \
+				>/usr/lib/vpostmaster/etc/wwwdb.conf
+	fi
+	chown vpostmaster:www-data /usr/lib/vpostmaster/etc/wwwdb.conf
+	chmod 440 /usr/lib/vpostmaster/etc/wwwdb.conf
+	if [ ! -f /usr/lib/vpostmaster/etc/vpostmaster-db.conf ]
+	then
+		echo "dbname=vpostmaster host=127.0.0.1 user=vpostmaster" \
+				"password=${PASSWORD_VPOSTMASTER}" \
+				>/usr/lib/vpostmaster/etc/vpostmaster-db.conf
+	fi
+	chown vpostmaster:root /usr/lib/vpostmaster/etc/vpostmaster-db.conf
+	chmod 400 /usr/lib/vpostmaster/etc/vpostmaster-db.conf
+)
+
+#  dovecot SQL file, there are several different config file formats
+#    based on version
+#  NOTE: variable cannot happen inside of a subshell or it won't be
+#    readable later
+DOVECOTVER=`dpkg -p dovecot-common | awk '/^Version/ { print $2 }'`
+DOVECOTVER="${DOVECOTVER#[0-9]:}"
+DOVECOTMAJ=`echo "$DOVECOTVER" | awk -F'.' '{ print $1 "." $2 }'`
+case "$DOVECOTMAJ" in
+	0.99)
+		if [ "${DOVECOTVER##*.}" == '20050712-2' ]
+		then
+			DOVECOTVER=0.99-special
+			VPMDCONF=/etc/dovecot/dovecot-vpostmaster.conf
+		else
+			DOVECOTVER=0.99
+			VPMDCONF=/etc/dovecot-pgsql.conf
+		fi
+		;;
+	1.2)
+		DOVECOTVER=1.2
+		VPMDCONF=/etc/dovecot/dovecot-vpostmaster.conf
+		;;
+	*)
+		DOVECOTVER=1.0.alpha
+		VPMDCONF=/etc/dovecot/dovecot-vpostmaster.conf
+		;;
+esac
+if [ -f $VPMDCONF ]
+then
+	PASSWORD_IMAPSERVER=`awk -F '=' '/^connect/ { print $6 }' $VPMDCONF`
+fi
+
+if [ -f /etc/postfix/vpm-domains ]
+then
+	PASSWORD_POSTFIX=`awk -F '=' '/^password/ { print $2 }' \
+			/etc/postfix/vpm-domains`
+fi
+
+VPOSTMASTER_UID=`awk -F: '/^vpostmaster:/ { print $3 }' /etc/passwd`
+VPOSTMASTER_GID=`awk -F: '/^vpostmaster:/ { print $4 }' /etc/passwd`
+(  # run following commands in umasked subshell for added password security
+	umask 077
+	if [ ! -f $VPMDCONF ]
+	then
+		if [ "$DOVECOTVER" == "0.99" ]
+		then
+			:>$VPMDCONF
+		else
+			echo "driver = pgsql" >$VPMDCONF
+		fi
+		echo "connect = host=127.0.0.1 dbname=vpostmaster user=imapserver" \
+				"password=$PASSWORD_IMAPSERVER" >>$VPMDCONF
+		echo "default_pass_scheme = CRYPT" >>$VPMDCONF
+		echo "password_query = SELECT users.cryptedpasswd AS password" \
+	  			"FROM users WHERE users.name = '%n' AND users.domainsname = '%d'" \
+				"AND users.active = 't' AND (SELECT active FROM domains" \
+				"WHERE name = '%d') = 't'" >>$VPMDCONF
+		echo "user_query = SELECT userdir AS home, $VPOSTMASTER_UID AS uid," \
+				"$VPOSTMASTER_GID AS gid FROM users WHERE users.name = '%n' AND" \
+				"users.domainsname = '%d' AND users.active = 't' AND" \
+				"(SELECT active FROM domains WHERE name = '%d') = 't'" >>$VPMDCONF
+
+		chown root $VPMDCONF
+		chmod 400 $VPMDCONF
+	fi
+
+	if [ ! -f /etc/postfix/vpm-domains ]
+	then
+		#  postfix SQL integration
+		echo "user=postfix" >/etc/postfix/vpm-domains
+		echo "password=${PASSWORD_POSTFIX}" >>/etc/postfix/vpm-domains
+		echo "hosts=127.0.0.1" >>/etc/postfix/vpm-domains
+		echo "dbname=vpostmaster" >>/etc/postfix/vpm-domains
+		echo "table=domains" >>/etc/postfix/vpm-domains
+		echo "select_field='X'" >>/etc/postfix/vpm-domains
+		echo "where_field=name" >>/etc/postfix/vpm-domains
+		echo "additional_conditions = and active = 't'" >>/etc/postfix/vpm-domains
+		chown root /etc/postfix/vpm-domains
+		chmod 400 /etc/postfix/vpm-domains
+	fi
+)
+
+#  check for different postgres versions
+if dpkg -l postgresql-8.4 2>/dev/null |grep '^ii' >/dev/null 2>&1
+then
+	PGVER=`dpkg -p postgresql-8.4|awk '/^Version/ { print $2 }'`
+elif dpkg -l postgresql-8.3 2>/dev/null |grep '^ii' >/dev/null 2>&1
+then
+	PGVER=`dpkg -p postgresql-8.3|awk '/^Version/ { print $2 }'`
+elif dpkg -l postgresql-8.2 2>/dev/null |grep '^ii' >/dev/null 2>&1
+then
+	PGVER=`dpkg -p postgresql-8.2|awk '/^Version/ { print $2 }'`
+elif dpkg -l postgresql-8.1|grep '^ii' >/dev/null 2>&1
+then
+	PGVER=`dpkg -p postgresql-8.1 2>/dev/null |awk '/^Version/ { print $2 }'`
+elif dpkg -l postgresql-8.0|grep '^ii' >/dev/null 2>&1
+then
+	PGVER=`dpkg -p postgresql-8.0 2>/dev/null |awk '/^Version/ { print $2 }'`
+elif dpkg -l postgresql-7.4 2>/dev/null |grep '^ii' >/dev/null 2>&1
+then
+	PGVER=`dpkg -p postgresql-7.4|awk '/^Version/ { print $2 }'`
+else
+	PGVER=`dpkg -p postgresql|awk '/^Version/ { print $2 }'`
+fi
+PGVER=${PGVER#*:}
+PGMAJ=${PGVER%%.*}
+PGMIN=`echo "$PGVER"|awk -F'.' '{ print $1 "." $2 }'`
+
+#  set variables based on versions
+if [ -x /etc/init.d/postgresql-"$PGMIN" ]
+then
+	PGINIT=/etc/init.d/postgresql-"$PGMIN"
+	PGBASE=/etc/postgresql/"$PGMIN"/main
+else
+	PGINIT=/etc/init.d/postgresql
+	PGBASE=/etc/postgresql
+fi
+
+if [ "$PGMAJ" -le 7 -o -z "$PGMAJ" ]
+then
+	PGLISTEN='tcpip_socket = true'
+	HOSTLINE='host all all 127.0.0.1 255.255.255.255 password'
+	REJECTLINE='host all all 0.0.0.0 0.0.0.0 reject'
+else
+	PGLISTEN="listen_addresses = '127.0.0.1'"
+	HOSTLINE='host all all 127.0.0.1/32 md5'
+fi
+
+#  set up the PostgreSQL data directory if it is not already
+[ ! -f /var/lib/postgres/data/postgresql.conf ] && $PGINIT restart
+
+#  adjust postgresql.conf
+if ! grep -q "^$PGLISTEN" $PGBASE/postgresql.conf
+then
+	bkup "$PGBASE/postgresql.conf"
+	echo $PGLISTEN >> $PGBASE/postgresql.conf
+	if grep -q "^unix_socket_directory = '/tmp'" "$PGBASE/postgresql.conf"
+	then
+		sed -i "s#^\(unix_socket_directory = \)'/tmp'#\1'/var/run/postgresql'#" \
+	  			"$PGBASE/postgresql.conf"
+	fi
+	if grep -q "^ssl = true" "$PGBASE/postgresql.conf"
+	then
+		sed -i 's/^ssl = true/#ssl = true/' "$PGBASE/postgresql.conf"
+		echo "ssl = false" >> "$PGBASE/postgresql.conf"
+	fi
+fi
+
+#  adjust pg_hba.conf
+if ! grep -q "$HOSTLINE" $PGBASE/pg_hba.conf
+then
+	bkup "$PGBASE/pg_hba.conf"
+	#  "host all all ... ident sameuser" lines over-rides later host lines
+	sed -i 's/^\(host.*\)/#\1/' $PGBASE/pg_hba.conf
+	echo "$HOSTLINE" >>$PGBASE/pg_hba.conf
+	[ -n "$REJECTLINE" ] && echo "$REJECTLINE" >>$PGBASE/pg_hba.conf
+fi
+
+#  start up postgresql
+$PGINIT restart
+
+# create users
+RARG=""
+createuser -? 2>&1 | grep -q no-createrole && RARG=-R
+su postgres -c "cd /tmp; createuser $RARG -A -D postfix 2>&1 | grep -v 'already exists'"
+su postgres -c \
+		"cd /tmp; createuser $RARG -A -D vpostmaster 2>&1 | grep -v 'already exists'"
+su postgres -c \
+		"cd /tmp; createuser $RARG -A -D vpostmasterwww 2>&1 | grep -v 'already exists'"
+su postgres -c \
+		"cd /tmp; createuser $RARG -A -D imapserver 2>&1 | grep -v 'already exists'"
+
+#  initialize postgres if needed
+DBEXIST=`su postgres -c \
+		"cd /tmp; psql -d vpostmaster -At -c 'SELECT count(*) FROM meta'" \
+		2>/dev/null`
+if [ "$DBEXIST" != 1 ]
+then
+	#  load schema
+	SCHEMAFILE=/usr/share/doc/vpostmaster/schema.sql
+	ZIPFILE="$SCHEMAFILE".gz
+	if [ ! -f "$SCHEMAFILE" -a -f schema.sql ]
+	then
+		SCHEMAFILE=`mktemp -tp /var/tmp schema.XXXXXXXXXX`
+		if [ -z "$SCHEMAFILE" ]
+		then
+			echo "Cannot create tempfile"
+			exit 1
+		fi
+		cp schema.sql "${SCHEMAFILE}"
+		chown postgres "${SCHEMAFILE}"
+	elif [ -f  "$ZIPFILE" ]
+	then
+		SCHEMAFILE=`mktemp -tp /var/tmp schema.XXXXXXXXXX`
+		if [ -z "$SCHEMAFILE" ]
+		then
+			echo "Cannot create tempfile"
+			exit 1
+		fi
+		zcat "${ZIPFILE}" >"${SCHEMAFILE}"
+		chown postgres "${SCHEMAFILE}"
+	fi
+	su postgres -c "cd /tmp; sh ${SCHEMAFILE}"
+fi
+
+#  get or set superuser password
+if [ -f /usr/lib/vpostmaster/etc/superuser ]
+then
+	PASSWORD_SUPERUSER=`awk '{ print $4 }' /usr/lib/vpostmaster/etc/superuser`
+	CRYPTED_SUPERUSER=`cryptpasswd "$PASSWORD_SUPERUSER" "$SALT"`
+else
+	(  # run in subshell for added password security
+		umask 077
+		echo "superuser password is: $PASSWORD_SUPERUSER" \
+				>/usr/lib/vpostmaster/etc/superuser
+	)
+fi
+
+#  find mailman user name
+MAILMANUSER=
+grep -q '^list:' /etc/passwd && MAILMANUSER=list
+grep -q '^mailman:' /etc/passwd && MAILMANUSER=mailman
+[ -z "$MAILMANUSER" ] && MAILMANUSER=mailman
+
+#  update user passwords and superuser account
+(
+	echo "ALTER USER postfix WITH PASSWORD '${PASSWORD_POSTFIX}';"
+	echo "ALTER USER vpostmaster WITH PASSWORD '${PASSWORD_VPOSTMASTER}';"
+	echo "ALTER USER vpostmasterwww WITH PASSWORD" \
+			"'${PASSWORD_VPOSTMASTERWWW}';"
+	echo "ALTER USER imapserver WITH PASSWORD '${PASSWORD_IMAPSERVER}';"
+	echo "DELETE FROM adminusers WHERE name='superuser';"
+	echo "INSERT INTO adminusers ( name, issuperuser, cryptedpasswd )" \
+			"VALUES ( 'superuser', 't', '$CRYPTED_SUPERUSER' );"
+	echo "UPDATE meta SET mailmanusername = '$MAILMANUSER';"
+) | su postgres -c "cd /tmp; psql -d vpostmaster"
+
+#  upgrade the database, apache, postfix, and dovecot should be 
+#  restarted shortly
+su postgres -c "cd /tmp; /usr/lib/vpostmaster/bin/vpm-dbupgrade --force"
+
+#  configure apache for squirrelmail
+if [ -f /etc/squirrelmail/apache.conf ]
+then
+	if ! grep -q "Alias /webmail" /etc/squirrelmail/apache.conf
+	then
+		bkup "/etc/squirrelmail/apache.conf"
+		echo "Alias /webmail /usr/share/squirrelmail" >>/etc/squirrelmail/apache.conf
+	fi
+	if [ -d /etc/apache2/conf.d/ -a ! -e /etc/apache2/conf.d/squirrelmail.conf ]
+	then
+		ln -s /etc/squirrelmail/apache.conf /etc/apache2/conf.d/squirrelmail.conf
+	fi
+	if [ -d /etc/apache/conf.d/ -a ! -e /etc/apache/conf.d/squirrelmail.conf ]
+	then
+		ln -s /etc/squirrelmail/apache.conf /etc/apache/conf.d/squirrelmail.conf
+	fi
+fi
+
+#  configure apache for mailman
+for APACHEDIR in /etc/apache2/conf.d/ /etc/apache/conf.d/
+do
+	#  go to next directory if this does not exist
+	[ ! -d "$APACHEDIR" ] && continue
+
+	#  skip if mailman already setup
+	[ -a "$APACHEDIR/mailman.conf" ] && continue
+
+	cat >>"$APACHEDIR/mailman.conf" <<@EOF
+ScriptAlias /cgi-bin/mailman/ /usr/lib/cgi-bin/mailman/
+ScriptAlias /mailman/ /usr/lib/cgi-bin/mailman/
+Alias /pipermail/ /var/lib/mailman/archives/public/
+Alias /images/mailman/ /usr/share/images/mailman/
+
+<Directory /usr/lib/cgi-bin/mailman/>
+    AllowOverride None
+    Options ExecCGI
+    AddHandler cgi-script .cgi
+    Order allow,deny
+    Allow from all
+</Directory>
+<Directory /var/lib/mailman/archives/public/>
+    Options Indexes FollowSymlinks
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+</Directory>
+<Directory /usr/share/images/mailman/>
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+</Directory>
+@EOF
+done
+
+#  configure to handle index.php
+for HTTPCONF in /etc/apache/httpd.conf /etc/apache2/apache2.conf
+do
+	if [ -f $HTTPCONF ] && ! grep -q index.php $HTTPCONF
+	then
+		bkup "$HTTPCONF"
+		sed -i 's/^\([ \t][ \t]*DirectoryIndex.*\)/\1 index.php/' \
+				$HTTPCONF
+	fi
+done
+
+if [ -f /etc/init.d/apache2 ]
+then
+	#  prefer apache2 over apache
+	if [ -f /etc/init.d/apache ]
+	then
+		/etc/init.d/apache stop
+		update-rc.d -f apache remove
+	fi
+	#  set start on boot
+	if ! grep -q "NO_START=0" /etc/default/apache2
+	then
+		bkup "/etc/default/apache2"
+		echo 'NO_START=0' >>/etc/default/apache2
+	fi
+	/etc/init.d/apache2 restart
+else
+	/etc/init.d/apache restart
+fi
+
+#  configure to handle config_local.php broken by default
+SQUIRRELMAILCONF=/etc/squirrelmail/config_local.php
+if [ -f "$SQUIRRELMAILCONF" ] && grep -q '^?>' "$SQUIRRELMAILCONF"
+then
+	bkup "$SQUIRRELMAILCONF"
+	sed -i 's/^\?>//' "$SQUIRRELMAILCONF"
+	echo "?>" >> "$SQUIRRELMAILCONF"
+fi
+
+#  set up sudoers file
+if ! grep -q "vpostmaster helper" /etc/sudoers
+then
+	bkup "/etc/sudoers"
+	cat >>/etc/sudoers <<@EOF
+
+#  vpostmaster helper, allow Apache to run it as vpostmaster
+www-data     ALL=(vpostmaster) NOPASSWD: /usr/lib/vpostmaster/bin/vpm-wwwhelper
+www-data     ALL=(root) NOPASSWD: /usr/lib/vpostmaster/bin/vpm-wwwhelper
+@EOF
+	echo "vpostmaster  ALL=($MAILMANUSER) NOPASSWD: " \
+			"/usr/lib/mailman/mail/mailman" >>/etc/sudoers
+fi
+
+#  NOTE: Disabled, this blows up pretty spectacularly
+##  set up SELinux if necessary
+#if [ -f /etc/sysconfig/selinux ] && ! grep -q 'SELINUX=disabled' &&
+#		! grep -q httpd_sys_script_t \
+#			/etc/selinux/strict/src/policy/domains/misc/local.te
+#then
+#	cat >>/etc/selinux/strict/src/policy/domains/misc/local.te <<@EOF
+#allow httpd_sys_script_t self:capability { setgid setuid };
+#allow httpd_sys_script_t self:process setrlimit;
+#allow httpd_sys_script_t shadow_t:file read;
+#allow postgresql_t tmp_t:file read;
+#@EOF
+#	( cd /etc/selinux/strict/src/policy; make load )
+#fi
+
+#  set up Postfix
+if ! grep -q 'vPostMaster setup' /etc/postfix/main.cf
+then
+	bkup "/etc/postfix/main.cf"
+	if postconf -m | grep -q '^pgsql$'; then
+		VMB_DOMAINS_MAP=pgsql:/etc/postfix/vpm-domains
+	else
+		VMB_DOMAINS_MAP=hash:/etc/postfix/vpm-domains-dump
+	fi
+	cat >>/etc/postfix/main.cf <<@EOF
+
+#  vPostMaster setup
+inet_interfaces = all
+virtual_transport = vpm-pftransport
+vpm-pftransport_destination_recipient_limit = 1
+virtual_mailbox_domains = $VMB_DOMAINS_MAP
+smtpd_sasl_auth_enable = yes
+smtpd_sasl_application_name = smtpd
+broken_sasl_auth_clients = yes
+#always_bcc = archive_address@example.com
+
+smtpd_recipient_restrictions =
+	permit_mynetworks
+	permit_sasl_authenticated
+	check_policy_service unix:private/vpm-pfpolicy
+	reject_unauth_destination
+@EOF
+fi
+
+#  don't do local delivery for the hostname in case it matches the
+#  one of the vPostMaster domains, use vPostMaster instead
+if egrep '^mydestination.*\$myhostname' /etc/postfix/main.cf
+then
+	sed -i -r 's/^(mydestination.*)\$myhostname,? ?/\1/' \
+			/etc/postfix/main.cf
+fi
+
+if ! grep -q 'vPostMaster setup' /etc/postfix/master.cf
+then
+	bkup "/etc/postfix/master.cf"
+	cat >>/etc/postfix/master.cf <<@EOF
+
+#  vPostMaster setup
+vpm-pfpolicy  unix  -       n       n       -       5       spawn
+  user=vpostmaster argv=/usr/lib/vpostmaster/postfix/vpm-pfpolicy
+vpm-pftransport unix  -       n       n       -       5       pipe
+    flags=qhu user=vpostmaster argv=/usr/lib/vpostmaster/postfix/vpm-pftransport \$sender \$recipient
+@EOF
+fi
+
+SASL_SMTPD=/etc/postfix/sasl/smtpd.conf
+if [ ! -f $SASL_SMTPD ] || ! grep -q 'pwcheck_method: saslauthd' $SASL_SMTPD
+then
+	echo "pwcheck_method: saslauthd" >> $SASL_SMTPD
+	echo "mech_list: plain login" >> $SASL_SMTPD
+fi
+
+/etc/init.d/postfix restart
+
+#  set up dovecot
+MAINCONF=/etc/dovecot/dovecot.conf
+if ! grep -q 'vPostMaster Configuration' $MAINCONF
+then
+	bkup "$MAINCONF"
+	case "$DOVECOTVER" in
+		1.2)
+			cat >$MAINCONF <<@EOF
+#  vPostMaster Configuration
+protocol imap {
+}
+
+protocol pop3 {
+  pop3_uidl_format = %08Xu%08Xv
+}
+
+auth default {
+  mechanisms = plain
+  passdb sql {
+     args = /etc/dovecot/dovecot-vpostmaster.conf
+  }
+  userdb sql {
+     args = /etc/dovecot/dovecot-vpostmaster.conf
+  }
+  user = root
+}
+
+mail_location = maildir:~/Maildir/
+first_valid_uid = 100
+protocols = imap imaps pop3 pop3s
+@EOF
+			;;
+		0.99)
+			cat >>$MAINCONF <<@EOF
+
+#  vPostMaster Configuration
+default_mail_env = maildir:~/Maildir/
+auth_userdb = pgsql /etc/dovecot-pgsql.conf
+auth_passdb = pgsql /etc/dovecot-pgsql.conf
+first_valid_uid = 100
+protocols = imap imaps pop3 pop3s
+@EOF
+			;;
+		0.99-special)
+			cat >$MAINCONF <<@EOF
+#  vPostMaster Configuration
+protocol imap {
+}
+
+protocol pop3 {
+}
+
+auth default {
+  mechanisms = plain
+  passdb = sql /etc/dovecot/dovecot-vpostmaster.conf
+  userdb = sql /etc/dovecot/dovecot-vpostmaster.conf
+  user = root
+}
+
+default_mail_env = maildir:~/Maildir/
+first_valid_uid = 100
+protocols = imap imaps pop3 pop3s
+@EOF
+			;;
+		*)
+			cat >$MAINCONF <<@EOF
+#  vPostMaster Configuration
+protocol imap {
+}
+
+protocol pop3 {
+  pop3_uidl_format = %08Xu%08Xv
+}
+
+auth default {
+  mechanisms = plain
+  passdb sql {
+     args = /etc/dovecot/dovecot-vpostmaster.conf
+  }
+  userdb sql {
+     args = /etc/dovecot/dovecot-vpostmaster.conf
+  }
+  user = root
+}
+
+default_mail_env = maildir:~/Maildir/
+first_valid_uid = 100
+protocols = imap imaps pop3 pop3s
+@EOF
+			;;
+	esac
+fi
+
+# setup dovecot user
+if ! grep -q dovecot /etc/group
+then
+	groupadd dovecot
+fi
+if ! grep -q dovecot /etc/passwd
+then
+	useradd -c "Dovecot mail server" -d /usr/lib/dovecot -s /bin/false \
+			-g dovecot dovecot
+fi
+
+chgrp dovecot /var/run/dovecot/login
+chmod 750 /var/run/dovecot/login
+
+/etc/init.d/dovecot stop
+/etc/init.d/dovecot start
+
+#  setup spamassassin
+if ! grep -q '#ENABLED=1' /etc/default/spamassassin
+then
+	bkup "/etc/default/spamassassin"
+	echo "ENABLED=1" >>/etc/default/spamassassin
+fi
+/etc/init.d/spamassassin restart
+
+#  set up saslauthd
+if ! grep -q '#vpostmaster' /etc/default/saslauthd
+then
+	bkup "/etc/default/saslauthd"
+	cat >>/etc/default/saslauthd <<@EOF
+
+#vpostmaster
+START=yes
+MECHANISMS=rimap
+PARAMS="-r -O 127.0.0.1"
+MECH_OPTIONS="127.0.0.1"
+OPTIONS="-c -r -m /var/run/saslauthd"
+@EOF
+
+	dpkg-statoverride --remove /var/run/saslauthd
+	dpkg-statoverride --add root sasl 755 /var/run/saslauthd
+fi
+/etc/init.d/saslauthd restart
+
+#  set up home directory
+if [ ! -d ~vpostmaster/.spamassassin ]
+then
+	mkdir ~vpostmaster/.spamassassin
+	chown vpostmaster ~vpostmaster/.spamassassin
+	chmod 700 ~vpostmaster/.spamassassin
+fi
+
+#  set up mailman paths
+[ -x /usr/lib/vpostmaster/bin/setup-mailman ] && \
+		/usr/lib/vpostmaster/bin/setup-mailman

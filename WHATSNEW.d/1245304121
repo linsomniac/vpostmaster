@@ -1,0 +1,2 @@
+Made debian init script LSB-compliant by adding proper headers.
+      (Issue reported by mattias)

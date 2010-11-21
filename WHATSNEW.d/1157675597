@@ -1,0 +1,2 @@
+vpmuser with --delete would not work because of missing privileges in the
+      database.  Reported by Jorgen Laukholm

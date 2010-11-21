@@ -1,0 +1,2 @@
+Fixing bug causing 'NoneType' object has no attribute 'cursor', reported by
+      Mike Loseke.

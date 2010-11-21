@@ -1,0 +1,3 @@
+User home directories are now deleted when the user is deleted, instead of
+      before a new account is created with the same name.  Suggested by
+      Jorgen Laukholm.

@@ -1,0 +1,11 @@
+Redo menu, remove linux distributions from products menu -> jafo
+Redo menu, change name to "Order Pro" from products/vpostmaster menu -> jafo
+Redo menu, remove "Install" from products/vpostmaster menu -> jafo
+Redo menu, change "Order Pro" to point at
+   https://secure.tummy.com/Order/vpostmaster.html -> jafo
+
+Redo install movie with current version of vpostmaster -> ???
+
+Write docs in vpostmaster explaining mailman integration -> efm
+Write docs in vpostmaster explaining autoresponders -> efm
+

@@ -1,0 +1,4 @@
+Adding much more debugging information to "check" rules.
+Writing a numeric value out to "/usr/lib/vpostmaster/etc/debug" will now
+      enable debugging.  "echo 3 >/usr/lib/vpostmaster/etc/debug" for lots
+      of debugging information.

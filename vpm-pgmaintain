@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+#
+# (c) 2005, 2006, 2010 tummy.com, ltd.
+#
+#  Postfix external policy filter for vPostMaster
+
+import string, sys, os, syslog
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+
+####################
+#  main program body
+vpmsupp.setupExceptHook()
+#dbConnect = vpmsupp.getConnectStr(
+#		'/usr/lib/vpostmaster/etc/vpostmaster-db.conf')
+dbConnect = 'dbname=vpostmaster'
+try:
+	connection = vpmsupp.connectToDb(dbConnect)
+	cursor = connection.cursor()
+except vpmsupp.psycopg.OperationalError:
+	syslog.syslog('Unable to connect to database, aborting.')
+	sys.exit(0)
+
+#  delete expired entries
+cursor.execute('DELETE FROM greylist WHERE expireafter < NOW()')
+connection.commit()
+
+#  optimize database
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE greylist')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE adminprivs')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE adminusers')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE domaindefaults')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE domains')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE enveloperules')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE users')
+cursor.execute('END')
+cursor.execute('VACUUM ANALYZE usersettings')
+connection.commit()
+
+cursor.close()
+connection.close()

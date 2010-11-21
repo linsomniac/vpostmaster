@@ -1,0 +1,13 @@
+dbname=vpostmaster host=127.0.0.1 user=vpostmasterwww password=secret
+
+# (c) 2005, 2006 tummy.com, ltd.
+# vPostMaster database script
+#
+#  The first line of this file contains the PostgreSQL connect string.
+#  It must exist entirely on the first line of the file and no more.  It
+#  may consist of:
+#
+#    dbname=<name>
+#    host=<hostname/IP>
+#    user=<Postgres user name, probably "vpostmasterwww">
+#    password=<password for this Postgres user>

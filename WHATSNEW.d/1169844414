@@ -1,0 +1,2 @@
+Changing the forward regex to allow upper and lower case characters, and be
+      more RFC compliant.  Suggested by Dan Sully, regex by Scott Kleihege

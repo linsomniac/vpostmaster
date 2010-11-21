@@ -1,0 +1,2 @@
+Added /usr/sbin:/sbin to the path environment variable during vpm-wwwhelper.
+	(Issue reported by Matt Tiner)

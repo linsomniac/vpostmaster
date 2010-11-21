@@ -1,0 +1,6 @@
+One feature I would love to see implemented, is a column in the
+   database keeping track of when a user was last logged in, and also visible
+   in the web-interface.
+   Sugested by Jorgen Laukholm
+   Would have to watch the maillog log file, unless support was added to
+   dovecot.

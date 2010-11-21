@@ -1,0 +1,4 @@
+Users can now have the extension character in their name, and the shortest
+      matching account name will be used.  So, you could create a
+      "user-one@example.com" and it will work, unless you also have a
+      "user" account (which would be preferred, with the extension "one").

@@ -1,0 +1,3 @@
+Raul A. Gallegos reported a bug when no delivery destination was specified.
+      Caused a traceback in vpm-pftransport for "os.remove" of a file that
+      was already removed.

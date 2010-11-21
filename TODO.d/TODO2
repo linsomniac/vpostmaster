@@ -1,0 +1,170 @@
+Make it so that a notification message can be triggered on mail delivery.
+So, user gets an incoming message, and an abstract is forwarded to their
+cell phone or similar.  Or an e-mail address which large attachments are
+sent to, and a notification is sent to a group that they have a new
+attachment sitting there.
+
+SqurrelMail Exchange Integration (found by efm):
+   From the bismark lug list by Carlson, Jason:
+   >I just wanted to let you know that I did get squirrelmails address book to
+   >work with the exchange 5.5 LDAP. I used the ldp.exe utility that comes with
+   >win2k and ran that against our exchange 5.5 server. I just had to enter in
+   >the ou and the o information that I got from the ldp utility
+
+Change banner of the SMTP server.
+
+Web management frontend:
+   Implement the multi-account "Delete" button on user_lookup.php.
+   Implement the multi-account "Deactivate" button on user_lookup.php.
+   Implement the multi-account "Activate" button on user_lookup.php.
+
+Configuration
+   Connect string for database
+   Make the greylist times configurable.
+   Make quota warning message configurable.
+
+Domain and site white-listing.
+Have system-swide defaults as well as domain defaults for settings.
+Auto-responder
+Configure to allow mailbox extensions to go into their own folders.
+RBL checking.
+Make a SquirrelMail configuration Plugin
+   http://www.squirrelmail.org/wiki/en_US/DevelopingPlugins
+Log of recent activity by user and domain.
+Limit max users per domain.
+Allow delivery checks to append headers to message.
+Allow for "user moved to" which cause bounces?
+Make some domain settings override the user settings.
+Graphs and statistics.
+
+Make the web domain update form so that if a quota is set it resets users
+      who have a greater quota or NULL so that they have this new quota.
+Make a web form that allows across-the-board quota setting for users.
+Implement "domain forced" domaindefaults settings.
+Enter password to confirm delete?
+
+Add CLI program to add/remove domains.
+Add CLI program to add/remove users.
+Add CLI program to set user passwords.
+Add CLI program to set admin passwords.
+
+Admin edit of domain should allow editing of catch-all and extension.
+
+www: Set up DNS for the mail server?
+
+www: Create a domain that already exists, and then try to change the name.
+www: Failed domain creations show an empty form.
+
+www: Adding a user, default to the domain max quota.
+
+www: Disable user functions on aliased domain.
+
+www: In the user settings right hand side, show the domain default as the
+recommended value.
+
+Limit size of message on a per user or domain basis.
+
+In domain create page, make it so that they can create a domain through
+      tummy.com.
+
+Save/Restore config files
+   What about saving user data, things in their sqwebmail, etc?
+
+Wizards for user configuration.
+
+See about configuring earlytalker support on a per-user basis.
+
+Mailman integration.
+
+Ability to add a logo to the pfvmail pages -- personalize/brand it.
+
+Add Hashcash checking.
+
+Show system information, possibly go red if there's a problem.
+   load
+   vmstat?
+   df -H
+
+Understand the following settings:
+   From: http://aribabiba.cosmoquimica.com.br/leandro/
+   #PGSQL
+   virtual_uid_maps = static:200
+   virtual_gid_maps = static:200
+   virtual_mailbox_base = /var/spool/virtual
+   virtual_mailbox_domains = pgsql:/etc/postfix/pgsql_virtual_domains_maps.cf
+   virtual_mailbox_maps = pgsql:/etc/postfix/pgsql_virtual_mailbox_maps.cf
+   virtual_alias_maps = pgsql:/etc/postfix/pgsql_virtual_alias_maps.cf
+   virtual_mailbox_limit = 51200000
+   virtual_transport = virtual
+
+   #SASL2
+   smtpd_sasl_auth_enable = yes
+   smtpd_recipient_restrictions = permit_sasl_authenticated
+               reject_unauth_destination, permit_mynetworks
+   smtpd_sasl_application_name = smtpd
+   broken_sasl_auth_clients = yes
+
+   #QUOTA
+   virtual_mailbox_limit_inbox = no
+   virtual_mailbox_limit_maps =
+   pgsql:/etc/postfix/pgsql_virtual_mailbox_size.cf
+   virtual_mailbox_limit_override = yes
+   virtual_maildir_extended = yes
+   virtual_create_maildirsize = yes
+   virtual_mailbox_limit = 100000000
+
+SMTP Message Submission Protocol on port 587
+   http://www.faqs.org/rfcs/rfc2476.html
+   Possibly with permit_auth_destination (though this will allow secondary MX
+   Possibly with reject_sender_login_mismatch
+   (Requires setting up smtpd_sender_login_maps)
+
+From Ted Ducker:
+   Do OS updates from the control panel.
+   Do application updates from the control panel.
+   Spam Assassing Updates.
+   Check to see if e-mail is coming in and going out.  Make sure that it's
+         working properly.
+   Check if SpamAssassin and Postfix are running.
+   "Troubleshoot problems in general".
+   Show the queue status.
+   Stop and start and restart vpostmaster, spamassassin, more?
+   System information such as memory, OS version, postfix version, disc
+         usage.
+
+For the catch-all address, perhaps in the UI flag the account when you're
+in the account view as it being the catch all.  Might be tricky if the
+catch-all goes to a forward that is removed.  Perhaps don't allow removal
+of a catch-all account, or force it to disable catch-all.
+
+When viewing an account that another account forwards to, mark it in some
+way?  When deleting that account, delete the forward?
+
+SASL auth:
+   From http://forums.fedoraforum.org/showthread.php?p=251591#post251591:
+   Went back to my original config (the one I had from
+   http://high5.net/postfixadmin/ howto) but tried the pam-mysql way of
+   doing smtp auth instead of the described sasl2 way, and after some
+   debugging...it worked!
+
+   # rpm -Uvh pam_mysql-0.5-0.src.rpm
+   # rpmbuild -ba /usr/src/redhat/SPECS/pam_mysql.spec
+   # rpm -Uvh /usr/src/redhat/RPMS/i386/pam_mysql-0.5-0.i386.rpm
+   # rpm -Uvh /usr/src/redhat/RPMS/i386/pam_mysql-debuginfo-0.5-0.i386.rpm
+
+   file /etc/pam.d/smtp:
+   auth sufficient pam_mysql.so user=postfix passwd=YOURPASSWORDHERE
+   host=localhost db=postfix table=mailbox usercolumn=username
+   passwdcolumn=password crypt=1 sqlLog=0
+   account required pam_mysql.so user=postfix passwd=YOURPASSWORDHERE
+   host=localhost db=postfix table=mailbox usercolumn=username
+   passwdcolumn=password crypt=1 sqlLog=0
+
+   file /usr/lib/sasl2/smtpd.conf (using stock FC3 cyrus-sasl):
+   pwcheck_method: saslauthd
+   mech_list: PLAIN LOGIN
+
+   file /etc/sysconfig/saslauthd:
+   SOCKETDIR=/var/run/saslauthd
+   MECH=pam
+   FLAGS="-r"

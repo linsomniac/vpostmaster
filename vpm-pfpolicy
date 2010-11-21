@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+#
+# (c) 2005, 2006 tummy.com, ltd.
+#
+#  Postfix external policy filter for vPostMaster
+
+dbConnect = 'dbname=vpostmaster'
+
+import string, sys, os, syslog
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+
+#  configure syslog connection
+syslog.openlog(os.path.basename(sys.argv[0]), syslog.LOG_PID, syslog.LOG_MAIL)
+
+
+###################
+strip = string.strip
+split = string.split
+lowercaseDict = { 'sender' : 1, 'recipient' : 1, 'client_name' : 1,
+		'helo_name' : 1 }
+def readValues(fp):	#{{{1
+	'''Read postfix policy data from the specified file, return None on EOF
+	or a dictionary of key/value pairs otherwise.'''
+
+	data = {}
+	readline = fp.readline
+	while 1:
+		line = readline()
+		if not line: return(None)
+		if line == '\n': return(data)
+		key, value = map(strip, split(line, '=', 1))
+		if lowercaseDict.has_key(key): value = string.lower(value)
+		data[key] = value
+
+
+#########################################################
+def processData(cursor, connection, data, fp, debug = 0):	#{{{1
+	'''Process collected data, determine a response.'''
+	
+	#  get information on user from database  {{{2
+	try:
+		( recipientLocal, recipientDomain, domainData,
+				userData ) = vpmsupp.lookupRecipient(cursor, connection,
+				data.get('recipient'), debug = debug)
+	except vpmsupp.InvalidRecipientException, e:
+		fp.write('action=REJECT %s\n\n' % e.reason)
+		return(1)
+
+	#  return check result
+	status, reason, addHeaders = vpmsupp.checkClass(debug = debug).runCheck(
+			cursor, connection, data, domainData, userData, 'smtp')
+	fp.write('action=%s %s\n\n' % ( status, reason ))
+
+
+####################
+#  main program body {{{1
+debug = vpmsupp.getDebug()
+vpmsupp.setupExceptHook()
+connection = vpmsupp.connectToDb(dbConnect)
+cursor = connection.cursor()
+while 1:
+	data = readValues(sys.stdin)
+	if data == None: break
+	connection.commit()		#  make sure we aren't in a transaction
+	processData(cursor, connection, data, sys.stdout, debug = debug)
+	sys.stdout.flush()
+cursor.close()
+connection.close()

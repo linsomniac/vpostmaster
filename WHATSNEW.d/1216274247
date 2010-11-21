@@ -1,0 +1,2 @@
+Modified vpm-wwwhelper to accept bulkadd command, calling vpmuser
+      for each new or deleted user.  (Developed for Adams Internet)

@@ -1,0 +1,78 @@
+#!/bin/sh -e
+### BEGIN INIT INFO
+# Provides:          saslathd-config-dir
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Create saslauthd config directory
+# Description:       This script will setup the saslauthd config directory
+#                    that may have been erased by bootclean.sh
+# X-Start-Before:    saslathd
+# X-Stop-After:      saslathd
+### END INIT INFO
+#
+# (c) 2005, 2009 tummy.com, ltd.
+#
+#  Setup saslauthd config directory that may have been erased by bootclean.sh
+
+DESC="vPostMaster sasl setup"
+SASL=saslauthd
+LNDIR=/var/run/saslauthd
+RUNDIR=/var/spool/postfix/var/run
+DEFAULT=/etc/default/vpostmaster
+
+#  source defaults file
+[ -e "${DEFAULT}" ] && . "${DEFAULT}"
+
+#  should we start?
+[ "${START}" != "yes" ] && exit 0
+
+#  check options
+case "${1}" in
+	start)
+		echo -n "Starting ${DESC}: "
+
+		#  check for missing link
+		if [ ! -L "${LNDIR}" ]; then
+			mkdir -p "${RUNDIR}"
+
+			#  is this the first time?
+			if [ ! -d "${LNDIR}.vpostmaster" -a -d "${LNDIR}" ]; then
+				cp -av "${LNDIR}" "${RUNDIR}/"
+				mv "${LNDIR}" "${LNDIR}.vpostmaster"
+			fi
+
+			#  distroy that which stands in the way
+			[ -d "${LNDIR}" ] && rm -rf "${LNDIR}"
+
+			#  need somewhere to land
+			[ -d "${RUNDIR}/${SASL}" ] || mkdir "${RUNDIR}/${SASL}"
+
+			#  revive the missing link
+			ln -s "${RUNDIR}/${SASL}" ${LNDIR}
+
+			###################################################
+			#  IF RUNNING AFTER BOOT, RESTART SASLAUTHD HERE
+			###################################################
+		fi
+
+		if [ -L "${LNDIR}" -a -d "${RUNDIR}/${SASL}" ]; then
+			echo "success."
+			exit 0
+		else
+			echo "(failed)."
+			exit 1
+		fi
+		;;
+	stop)
+		;;
+	*)
+		NAME=`basename $0`
+		echo "${NAME} should only run on boot" >&2
+		echo "Usage: /etc/init.d/${NAME} start" >&2
+		exit 1
+		;;
+esac
+
+exit 0

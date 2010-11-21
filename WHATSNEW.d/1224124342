@@ -1,0 +1,2 @@
+Changed execution of queries in vpm-pgmaintain to separate vacuums to 
+	their own execute statements to fix cron errors on Ubuntu 8.04 systems.

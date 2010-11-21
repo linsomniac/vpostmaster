@@ -1,0 +1,10 @@
+
+================================
+Version 1.27 -- Wed Mar 22, 2006
+
+There was a bug in the 1.26 release "vpm-dbupgrade" script which caused it
+      to fail if no domain defaults were set.  This is a non-fatal error,
+      and is corrected simply by upgrading to version 1.27.  Problem found
+      and reported by Kevin Fenzi.
+Fixing a bug in the release script that caused WHATSNEW file to be empty.
+

@@ -1,0 +1,4 @@
+Make vpostmaster act as a front-end for an existing mail server.
+   Anti-spam settings would be configurable by the owner user.
+   Allowed users would be detected by SMTP connection to backend.
+   Password would be verified by checking with backend POP/IMAP server.

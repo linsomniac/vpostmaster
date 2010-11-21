@@ -1,0 +1,23 @@
+Using procmail with vPostMaster
+
+As of version 1.16, vPostMaster will look for a ".procmailrc" file in the
+virtual users home directory
+("/var/spool/vpostmaster/domains/ex/example.com/mailboxes/us/username").
+If it exists there, procmail will be called for final delivery of messages
+to the local mailfolders.  Note that by default, procmail will try to
+deliver to "/var/mail/vpostmaster", which is probably not what you want.
+
+In order to deliver to the Maildir, you will probably want to early on in
+your .procmailrc file have the line:
+
+   DEFAULT=$VPOSTMASTER_DEFAULT/
+
+Note that the trailing "/" is very important, it specifies Maildir format
+delivery.
+
+The environment that procmail is run in includes the values:
+
+   VPOSTMASTER_DEFAULT  Full path to Maildir which message was going to be
+                        delivered to.  If quarantined, this will be the
+                        quarantine folder, otherwise the main folder.
+   VPOSTMASTER_HOME     The home directory for the virtual user.

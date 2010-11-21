@@ -1,0 +1,64 @@
+Notes on building Postfix on CentOS 4
+Sean Reifschneider
+2008-09-03
+=====================================
+
+Get the Source RPM, for example:
+
+   http://mirrors.tummy.com/pub/ftp.redhat.com/redhat/linux/updates/enterprise/4Desktop/en/os/SRPMS/postfix-2.1.5-4.2.RHEL4.src.rpm
+
+rpm -ivh postfix-2.1.5-4.2.RHEL4.src.rpm
+
+cd /usr/src/redhat/SPECS
+
+vi postfix.spec
+   Search for MYSQL, and add a line below it for PGSQL like:
+
+      %define MYSQL 0
+      %define PGSQL 1
+
+   Search again and copy the section for the Requires:
+
+      %if %{PGSQL}
+      Requires: postgresql
+      BuildRequires: postgresql postgresql-devel
+      %endif
+
+   Search again and copy the section for the compile args:
+
+      %if %{PGSQL}
+         CCARGS="${CCARGS} -DHAS_PGSQL"
+         AUXLIBS="${AUXLIBS} -lpq"
+      %endif
+
+   Change the "Name:" line to:
+
+      Name: postfix+pgsql
+
+   Change the "Source0:" line from "%{name}" to "postfix":
+
+      Source0: ftp://ftp.porcupine.org/mirrors/postfix-release/official/postfix-%{version}.tar.gz
+
+   Change the "%setup" line to have "-n postfix-%{version}":
+
+      %setup -q -n postfix-%{version}
+
+   Build:
+
+      rpmbuild -ba postfix.spec
+
+   Test it.
+
+   Put into repo:
+
+      Remove the previous RPM
+
+      Move into vpostmaster-yum/centos/4/i386
+
+         postfix+pgsql-2.1.5-4.2.RHEL4.src.rpm
+         postfix+pgsql-2.1.5-4.2.RHEL4.i386.rpm
+         postfix+pgsql-pflogsumm-2.1.5-4.2.RHEL4.i386.rpm
+
+      cd ../../..
+      make sign
+      make install

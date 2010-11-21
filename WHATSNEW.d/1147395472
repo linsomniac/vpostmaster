@@ -1,0 +1,2 @@
+Patching all form field retrievals so that escaping is undone depending on
+      the setting of magic_quotes_gpc.  Reported by Jonathan Wilson.

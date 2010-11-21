@@ -1,0 +1,4 @@
+Fix for old database schema issue with new version of Postgres which
+      results in "Query failed: ERROR: operator does not exist:
+      text = integer at character [...]".  Reported by Kirby Ubben and
+      Jorgen Haseth Laukhol

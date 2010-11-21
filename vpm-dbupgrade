@@ -1,0 +1,489 @@
+#!/usr/bin/env python
+#
+# (c) 2005, 2006 tummy.com, ltd.
+#
+#  Convert the database from an older format to a newer one.
+
+dbConnect = 'dbname=vpostmaster'
+
+import string, sys, os, syslog
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+
+####################################
+def updateFrom3(cursor, connection):
+	newVersion = 4
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+	cursor.execute('GRANT SELECT ON meta TO vpostmaster')
+	cursor.execute('GRANT INSERT ON users TO vpostmaster')
+	cursor.execute('GRANT UPDATE ON users_id_seq TO vpostmaster')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+####################################
+def updateFrom4(cursor, connection):
+	newVersion = 5
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+	cursor.execute('ALTER TABLE meta ADD COLUMN mailmanmailcmd TEXT;')
+	cursor.execute('ALTER TABLE meta ALTER COLUMN mailmanmailcmd '
+			'SET DEFAULT NULL;')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+####################################
+def updateFrom5(cursor, connection):
+	newVersion = 6
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+	updateSQL = '''
+-- auto responder information
+CREATE TABLE autoresponders (
+   id SERIAL UNIQUE,
+
+   -- link to the users record
+   usersid INTEGER
+      REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+
+   -- auto-responder information
+   description TEXT,
+   message TEXT NOT NULL
+   );
+
+-- Per-responder settings.
+CREATE TABLE autorespondersettings (
+   id SERIAL UNIQUE,
+
+   -- link to the autoresponders record
+   autorespondersid INTEGER
+      REFERENCES autoresponders(id) ON DELETE CASCADE ON UPDATE CASCADE,
+
+   -- key/value pairs
+   key TEXT NOT NULL,
+   value TEXT,
+
+   UNIQUE(autorespondersid, key)
+   );
+
+-- response limits on replies
+CREATE TABLE autorespondershistory (
+   id SERIAL UNIQUE,
+
+   -- link to the autoresponder record
+   autorespondersid INTEGER UNIQUE
+      REFERENCES autoresponders(id) ON DELETE CASCADE ON UPDATE CASCADE,
+
+   -- when this record expires
+   expires TIMESTAMP NOT NULL,
+
+   -- sender address
+   sender TEXT NOT NULL,
+
+   UNIQUE(autorespondersid, sender)
+   );
+
+	GRANT SELECT, INSERT, DELETE, UPDATE ON autorespondershistory TO vpostmaster;
+	GRANT UPDATE ON autorespondershistory_id_seq TO vpostmaster;
+	GRANT SELECT ON autorespondersettings, autoresponders TO vpostmaster;
+	GRANT ALL ON autorespondersettings, autoresponders TO vpostmasterwww;
+	GRANT UPDATE ON autorespondersettings_id_seq, autoresponders_id_seq
+			TO vpostmasterwww;
+	'''
+	cursor.execute(updateSQL)
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+
+	connection.commit()
+
+
+####################################
+def updateFrom6(cursor, connection):
+	newVersion = 7
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+	cursor.execute('ALTER TABLE meta ADD COLUMN mailmanvardir TEXT;')
+	cursor.execute('ALTER TABLE meta ALTER COLUMN mailmanvardir '
+			'SET DEFAULT NULL;')
+	cursor.execute('ALTER TABLE meta ADD COLUMN mailmanbindir TEXT;')
+	cursor.execute('ALTER TABLE meta ALTER COLUMN mailmanbindir '
+			'SET DEFAULT NULL;')
+
+	#  set the values
+	for testfile, destdir in [
+			( '/usr/lib/mailman/bin/newlist', '/usr/lib/mailman/bin' ),
+			]:
+		if os.path.exists(testfile):
+			cursor.execute('UPDATE meta SET mailmanbindir = %s', ( destdir, ))
+	for testfile, destdir in [
+			( '/var/lib/mailman/lists', '/var/lib/mailman' ),
+			]:
+		if os.path.exists(testfile):
+			cursor.execute('UPDATE meta SET mailmanvardir = %s', ( destdir, ))
+	for testfile, destdir in [
+			( '/usr/lib/mailman/mail/mailman', None ),
+			]:
+		if os.path.exists(testfile):
+			cursor.execute('UPDATE meta SET mailmanmailcmd = %s', ( testfile, ))
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+####################################
+def updateFrom7(cursor, connection):
+	newVersion = 8
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('SELECT value FROM domaindefaults '
+			'WHERE domainsid IS NULL AND key = %s', ( 'clamavaction', ))
+	row = cursor.fetchone()
+	if row and row[0] == 'enabled':
+		cursor.execute('UPDATE domaindefaults SET value = %s '
+				'WHERE domainsid IS NULL AND key = %s',
+				( 'disabled', 'clamavaction' ))
+
+	cursor.execute('SELECT value FROM domaindefaults '
+			'WHERE domainsid IS NULL AND key = %s', ( 'spfaction', ))
+	row = cursor.fetchone()
+	if row and row[0] == 'enabled':
+		cursor.execute('UPDATE domaindefaults SET value = %s '
+				'WHERE domainsid IS NULL AND key = %s', ( 'reject', 'spfaction' ))
+
+	cursor.execute('UPDATE usersettings SET value = %s '
+			'WHERE key = %s AND value = %s', ( 'reject', 'spfaction', 'enabled' ))
+	cursor.execute('UPDATE usersettings SET value = %s '
+			'WHERE key = %s AND value = %s',
+			( 'disabled', 'clamavaction', 'enabled' ))
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+####################################
+def updateFrom8(cursor, connection):
+	newVersion = 9
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('GRANT DELETE ON users TO vpostmaster;')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+####################################
+def updateFrom9(cursor, connection):
+	newVersion = 10
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('ALTER TABLE domains ALTER extensionchar DROP NOT NULL;')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom10(cursor, connection):
+	newVersion = 11
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	#  Double-check that tables don't already exist
+	cursor.execute('SELECT COUNT(*) FROM pg_tables WHERE tablename = %s',
+				( 'extraattributes', ))
+	if cursor.fetchone()[0] <= 0:
+		print 'Updating to version %s of the schema.' % newVersion
+
+		cursor.execute('''
+				CREATE TABLE extraattributes (
+					id SERIAL UNIQUE,
+
+					name TEXT UNIQUE NOT NULL,
+					class TEXT NOT NULL,
+					label TEXT UNIQUE NOT NULL,
+					description TEXT
+					);
+
+				CREATE TABLE extrasettings (
+					id SERIAL UNIQUE,
+
+					usersid INTEGER
+						REFERENCES users(id)
+						ON DELETE CASCADE ON UPDATE CASCADE,
+
+					attributesid INTEGER
+						REFERENCES extraattributes(id)
+						ON DELETE CASCADE ON UPDATE CASCADE,
+
+					value_text TEXT,
+
+					UNIQUE(usersid, attributesid)
+					);
+
+				GRANT SELECT ON extraattributes, extrasettings TO vpostmasterwww;
+				GRANT INSERT, UPDATE, DELETE ON extrasettings, extrasettings_id_seq
+						TO vpostmasterwww;
+
+				ALTER TABLE domains ADD COLUMN allowextraattributes BOOLEAN;
+				UPDATE DOMAINS SET allowextraattributes = 't';
+				ALTER TABLE domains ALTER COLUMN allowextraattributes SET DEFAULT 't';
+				ALTER TABLE domains ALTER COLUMN allowextraattributes SET NOT NULL;
+				''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom11(cursor, connection):
+	newVersion = 12
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	#  Double-check that changes haven't already been made
+	cursor.execute('''
+			SELECT COUNT(*) FROM information_schema.columns 
+			WHERE table_name = %s AND column_name = %s''',
+				( 'meta', 'mailmanusername' ))
+	if cursor.fetchone()[0] <= 0:
+		print 'Updating to version %s of the schema.' % newVersion
+
+		#  find mailman user name
+		import pwd
+		try:
+			pwd.getpwnam('list')
+			mailmanusername = 'list'
+		except KeyError: mailmanusername = 'mailman'
+
+		cursor.execute('ALTER TABLE meta ADD COLUMN mailmanusername TEXT;')
+		cursor.execute('ALTER TABLE meta ALTER COLUMN mailmanusername '
+				'SET DEFAULT NULL;')
+		cursor.execute('UPDATE meta SET mailmanusername = %s', ( mailmanusername, ))
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom12(cursor, connection):
+	newVersion = 13
+	#  REMEMBER TO UPDATE THE SCHEMA TO THE NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('''
+			GRANT UPDATE ON users TO vpostmaster;
+			GRANT SELECT ON extraattributes, extrasettings TO vpostmaster;
+			GRANT INSERT, UPDATE, DELETE ON extrasettings, extrasettings_id_seq
+			      TO vpostmaster;
+			''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom13(cursor, connection):
+	newVersion = 14
+	#  REMEMBER TO UPDATE THE SCHEMA TO THIS NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	#  Double-check that changes haven't already been made
+	cursor.execute('''
+			SELECT COUNT(*) FROM information_schema.columns 
+			WHERE table_name = %s AND column_name = %s''',
+				( 'domains', 'allowuserspamcontrol' ))
+	if cursor.fetchone()[0] <= 0:
+		print 'Updating to version %s of the schema.' % newVersion
+
+		cursor.execute('''
+				ALTER TABLE domains ADD COLUMN allowuserspamcontrol BOOLEAN;
+				UPDATE DOMAINS SET allowuserspamcontrol = 't';
+				ALTER TABLE domains ALTER COLUMN allowuserspamcontrol SET DEFAULT 't';
+				ALTER TABLE domains ALTER COLUMN allowuserspamcontrol SET NOT NULL;
+				''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom14(cursor, connection):
+	newVersion = 15
+	#  REMEMBER TO UPDATE THE SCHEMA TO THIS NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	#  Double-check that changes haven't already been made
+	cursor.execute('''
+			SELECT COUNT(*) FROM information_schema.columns 
+			WHERE table_name = %s AND column_name = %s''',
+				( 'users', 'plaintextpasswd' ))
+	if cursor.fetchone()[0] <= 0:
+		print 'Updating to version %s of the schema.' % newVersion
+
+		cursor.execute('''
+				ALTER TABLE users ADD COLUMN plaintextpasswd TEXT;
+				UPDATE users SET plaintextpasswd = '';
+				ALTER TABLE users ALTER COLUMN plaintextpasswd SET DEFAULT '';
+				ALTER TABLE users ALTER COLUMN plaintextpasswd SET NOT NULL;
+				''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom15(cursor, connection):
+	newVersion = 16
+	#  REMEMBER TO UPDATE THE SCHEMA TO THIS NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	clamscanCommand = 'clamscan --stdout -'
+	if (
+			os.path.exists('/usr/bin/clamdscan')
+			and os.system('clamdscan  --quiet --stdout /etc/services '
+					'>/dev/null 2>&1') == 0
+			):
+		clamscanCommand = '/usr/bin/clamdscan --stdout -'
+
+	cursor.execute('''
+			ALTER TABLE meta ADD COLUMN clamscancommand TEXT;
+			ALTER TABLE meta ALTER COLUMN clamscancommand SET DEFAULT NULL;
+			UPDATE meta SET clamscancommand = %s
+			''', ( clamscanCommand, ))
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom16(cursor, connection):
+	newVersion = 17
+	#  REMEMBER TO UPDATE THE SCHEMA TO THE NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('''
+			GRANT SELECT ON domaindefaults TO vpostmaster;
+			GRANT INSERT ON usersettings TO vpostmaster;
+			GRANT UPDATE ON usersettings_id_seq TO vpostmaster;
+			''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom17(cursor, connection):
+	newVersion = 18
+	#  REMEMBER TO UPDATE THE SCHEMA TO THE NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('''
+			ALTER TABLE autorespondershistory
+					DROP CONSTRAINT autorespondershistory_autorespondersid_key;
+
+			ALTER TABLE autorespondershistory
+					DROP CONSTRAINT autorespondershistory_autorespondersid_key1;
+			ALTER TABLE ONLY autorespondershistory
+					ADD CONSTRAINT autorespondershistory_autorespondersid_key
+					UNIQUE (autorespondersid, sender);
+			''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#####################################
+def updateFrom18(cursor, connection):
+	newVersion = 19
+	#  REMEMBER TO UPDATE THE SCHEMA TO THE NEW VERSION IN THE META TABLE
+	cursor.execute('SELECT databaseversion FROM meta')
+	if cursor.fetchone()[0] >= newVersion: return(0)
+
+	print 'Updating to version %s of the schema.' % newVersion
+
+	cursor.execute('''
+			ALTER TABLE domains ADD requireforwardwithindomain BOOLEAN;
+			UPDATE domains SET requireforwardwithindomain = 'f';
+			ALTER TABLE domains
+					ALTER COLUMN requireforwardwithindomain SET DEFAULT 'f';
+			ALTER TABLE domains
+					ALTER COLUMN requireforwardwithindomain SET NOT NULL;
+			''')
+
+	cursor.execute('UPDATE meta SET databaseversion = %s', ( newVersion, ))
+	connection.commit()
+
+
+#  display a warning message
+if not '--force' in sys.argv:
+	print ('WARNING: This program should only be run with your mail system '
+			'fully down.\nNormally this would involve shutting down the '
+			'"dovecot", "httpd" and\n"postfix" services.  Running this program '
+			'while the system is running may\nresult in bounced mail and possibly '
+			'data corruption.  Please make sure the\nsystem is down before '
+			'running this.')
+	print
+	print ('No action is taken by this program unless it is run with the '
+			'"--force" option.')
+	print ('Once you have made sure the mail server is down, please re-run this '
+			'program\nwith "--force" to cause the database update to occur.')
+	sys.exit(1)
+
+
+###########################################
+connection = vpmsupp.connectToDb(dbConnect)
+cursor = connection.cursor()
+updateFrom3(cursor, connection)
+updateFrom4(cursor, connection)
+updateFrom5(cursor, connection)
+updateFrom6(cursor, connection)
+updateFrom7(cursor, connection)
+updateFrom8(cursor, connection)
+updateFrom9(cursor, connection)
+updateFrom10(cursor, connection)
+updateFrom11(cursor, connection)
+updateFrom12(cursor, connection)
+updateFrom13(cursor, connection)
+updateFrom14(cursor, connection)
+updateFrom15(cursor, connection)
+updateFrom16(cursor, connection)
+updateFrom17(cursor, connection)
+updateFrom18(cursor, connection)
+#  REMEMBER TO UPDATE THE SCHEMA TO THIS NEW VERSION IN THE META TABLE
+cursor.close()
+connection.close()

@@ -1,0 +1,2 @@
+Fixing bug: SPF if set to quarantine was actually doing reject.
+      Reported by Wallace Winfrey

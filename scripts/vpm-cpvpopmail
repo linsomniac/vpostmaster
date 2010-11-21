@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+#
+#  Copy vpopmail users into vPostMaster.
+
+vpmuserCmd = '/usr/lib/vpostmaster/bin/vpmuser'
+
+import sys, os, re, string
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+if len(sys.argv) < 2:
+	sys.stderr.write('usage: %s <domain> [...]\n'
+			% os.path.basename(sys.argv[0]))
+	sys.exit(1)
+
+#  connect to database
+dbConnect = vpmsupp.getConnectStr(
+                '/usr/lib/vpostmaster/etc/wwwdb.conf')
+connection = vpmsupp.connectToDb(dbConnect)
+cursor = connection.cursor()
+
+#  check for existance of domains
+for srcDomain in sys.argv[1:]:
+	if not os.path.exists('/home/vpopmail/domains/%s' % srcDomain):
+		print 'vopmail domain "%s" does not exist.' % srcDomain
+		sys.exit(1)
+	cursor.execute('select count(*) from domains where name = %s',
+			( srcDomain, ))
+	if cursor.fetchone()[0] != 1:
+		print 'vPostMaster domain "%s" does not exist.' % srcDomain
+		sys.exit(1)
+
+#  check pre-conditions
+if not os.path.exists(vpmuserCmd):
+	print 'Can not find vpmuser command, expected it to be in:'
+	print '   %s' % vpmuserCmd
+	sys.exit(1)
+
+#  copy users
+errors = 0
+for srcDomain in sys.argv[1:]:
+	print 'Copying domain "%s"' % srcDomain
+
+	vpasswdFp = open('/home/vpopmail/domains/%s/vpasswd' % srcDomain, 'r')
+	for line in vpasswdFp.readlines():
+		line = string.strip(line)
+		data = string.split(line, ':')
+		username = data[0]
+		passwd = data[-1]
+		homedir = data[5]
+		dstDomain = srcDomain
+
+		print '   Copying user "%s@%s"...' % ( username, srcDomain )
+
+		#  create user
+		os.environ['VPMACTION'] = 'create'
+		os.environ['VPMDOMAIN'] = dstDomain
+		os.environ['VPMUSER'] = username
+		os.environ['VPMPASSWORD'] = passwd
+		ret = os.system('%s --create --environment' % vpmuserCmd)
+		if ret != 0:
+			print '   ERROR: Failed to create user "%s@%s", not copying mail.' % (
+					username, dstDomain )
+			errors = errors + 1
+			continue
+
+		#  get new home directory
+		connection.commit()
+		cursor.execute('SELECT userdir FROM users '
+				'WHERE name = %s AND domainsname = %s', ( username, dstDomain ))
+		ret = cursor.fetchone()
+		if not ret:
+			print '   ERROR: Unable to get vPostMaster home directory.'
+			errors = errors + 1
+			continue
+		vpmHomedir = ret[0]
+
+		#  copy files
+		ret = os.system('cp -a "%s"/. "%s"/' % ( homedir, vpmHomedir ))
+		if ret != 0:
+			print '   ERROR: Failed while copying mail files.'
+			errors = errors + 1
+		ret = os.system('chown -R vpostmaster "%s"/' % ( vpmHomedir, ))
+
+		#  look at forwards
+		qmailFile = homedir + '/.qmail'
+		if os.path.exists(qmailFile):
+			forwards = ''
+			localAlso = 0
+			fp = open(qmailFile, 'r')
+			for line in fp.readlines():
+				line = string.strip(line)
+				if line[0] == '&':
+					forwards = forwards + line[1:] + '\n'
+					continue
+				elif forwards[:len(homedir)] == homedir:
+					localAlso = 1
+				else:
+					print '   ERROR: Unsupported line in .qmail forward: "%s"' % line
+					errors = errors + 1
+			forwards = string.strip(forwards)
+			
+			if forwards:
+				cursor.execute('UPDATE users SET forwardto = %s '
+						'WHERE name = %s AND domainsname = %s',
+						( forwards, username, dstDomain ))
+				connection.commit()
+			if not localAlso:
+				cursor.execute('UPDATE users SET localdeliveryenabled = \'f\' '
+						'WHERE name = %s AND domainsname = %s',
+						( username, dstDomain ))
+				connection.commit()
+
+print
+print 'Errors: %d' % errors

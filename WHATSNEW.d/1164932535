@@ -1,0 +1,2 @@
+Including a script to restart saslauthd if it's not running.
+      saslauthd on some systems regularly dies, this is a work-around.

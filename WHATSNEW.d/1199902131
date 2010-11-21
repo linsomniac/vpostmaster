@@ -1,0 +1,4 @@
+Adding "extra" values for non-mail attributes that can be set on users.
+      This allows an administrator to set other administrative values on
+      users such as "is a dial-up user" to use the vPostMaster database for
+      other accounting-types of things.  Funded by Egyptian Internet.

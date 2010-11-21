@@ -1,0 +1,2 @@
+Allowing database passwords to be encrypted using MD5 or SHA format
+      (with "$1$" or "$2$" prefix).

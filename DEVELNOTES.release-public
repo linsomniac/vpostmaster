@@ -1,0 +1,160 @@
+VERSION=1.64
+
+vi debian/changelog
+Add a new entry for this release
+svn commit -m 'Committing debian/changelog'
+
+./scripts/whatsnew
+   Say yes to tag a new release.
+   Enter $VERSION
+cd ../commercial
+svn update
+svnmerge merge
+svn commit -m 'Merging from public'
+***svn rm <THE WHATSNEW.D FILE MERGED ABOVE>
+svn commit -m 'Removing the public release tag file.'
+cd ../public
+
+svn cp -m "$VERSION release" svn+ssh://vcs/var/svn/vpostmaster/public/trunk svn+ssh://vcs/var/svn/vpostmaster/public/tags/release-$VERSION
+
+cd /tmp
+rm -rf vpostmaster-${VERSION}*
+release "$VERSION" vpostmaster
+#  ENTER MY GPG PASS PHRASE
+
+Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
+systems aren't happy with.
+
+scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
+ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
+ssh root@dev cp /tmp/vpostmaster-$VERSION.tar.gz \
+      /usr/src/redhat/SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      /usr/src/redhat/RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm \
+      /home/software/
+for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
+   scp root@dev:/usr/src/redhat/"$file" /tmp/
+done
+
+#  PUSH INTO YUM
+
+cd projects/vpostmaster-yum
+for file in `find [fc]* -type f -name vpostmaster\*.rpm`; do rm -f "$file";
+      cp /tmp/vpostmaster-$VERSION*.noarch.rpm `dirname "$file"`; done
+make sign
+
+#  Build Hardy packages:
+
+   VPMBUILDHOST=theobromine
+   REPODIR=ubuntu/hardy
+
+   ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Dapper packages:
+
+   VPMBUILDHOST=10.242.1.201
+   REPODIR=ubuntu/dapper
+
+   ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Lucid packages:
+
+   VPMBUILDHOST=10.242.1.199
+   REPODIR=ubuntu/lucid
+
+   ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Debian Lenny packages:
+
+   VPMBUILDHOST=10.242.1.202
+   REPODIR=debian/lenny
+
+   ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  RUN TESTING
+
+#  RELEASE
+
+cd projects/vpostmaster-yum
+make install
+echo "$VERSION" | ssh root@dev 'cat >/home/httpd/updates.vpostmaster.com/html/currentversion.txt'
+
+Send out announcement:
+mutt -s "New vPostMaster public release $VERSION" vpostmaster@lists.tummy.com
+
+We are happy to release a new public version of vPostMaster.  You can
+upgrade to the new version using your normal system packaging tools, as
+normal.  For example "yum update" or "apt-get update; apt-get
+dist-upgrade".
+
+The particularly interesting changes are:
+
+XXXXXX
+
+The full change log for this version is:
+
+!!~/projects/vpostmaster/public/scripts/joinparts ~/projects/vpostmaster/public/WHATSNEW.d

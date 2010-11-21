@@ -1,0 +1,5 @@
+Is it possible to reduce mail copies?  If a message is sent to multiple
+      addresses, and those addresses forward to other addresses, each end
+      user should get only one copy.  Would require that the transport code
+      receive delivery information for all recipients, and delivery to all
+      of them, and resolve all forward destinations.

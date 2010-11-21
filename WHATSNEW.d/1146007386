@@ -1,0 +1,3 @@
+If an account was forwarding to another account and also had local
+      delivery, the local delivery was not being done.  Reported by
+      Fernando Novello

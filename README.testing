@@ -1,0 +1,28 @@
+Basic Testing Steps
+===================
+
+can login to website
+	setup domain
+	setup user
+	setup admin user
+	delete user
+	delete domain
+	delete admin user
+	decrease greylist timeout
+	set ClamAV action to Drop
+drops GTUBE message
+drops EICAR message
+successfully delivers outgoing message
+successfully accepts incoming message
+can log into webmail
+smtp auth
+pop login
+imap login
+
+Pro Version
+===========
+as above
+setup a new list
+subscribe to list
+post to list
+

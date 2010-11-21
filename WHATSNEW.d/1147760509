@@ -1,0 +1,3 @@
+Forwarding: Adding "--" to sendmail command before recipient arguments.
+Forwarding: Adding more logging in the event of a sendmail non-zero
+      exit-code.  Reported by Pete Humphrey.

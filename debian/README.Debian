@@ -1,0 +1,17 @@
+The Debian Package vpostmaster
+----------------------------
+
+Comments regarding the Package
+
+Scott Kleihege <scott-dpkg@tummy.com>, Tue,  3 May 2005 18:23:05 -0600
+
+Also requires python-spf, available from tummy.com repository.
+See /usr/share/doc/vpostmaster/INSTALL.gz for more information.
+
+After installing, run /usr/lib/vpostmaster/bin/setup-debian to configure
+  related packages.  During this process several configuration files will
+  be backed up with the .vpostmaster extension.
+
+To remove, run /usr/lib/vpostmaster/bin/remove-debian to reset the
+  configuration of related packages using the backed up .vpostmaster
+  configuration files.

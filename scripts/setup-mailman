@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+#
+# (c) 2007 tummy.com, ltd.
+#
+#  Set mailman locations in the meta table.
+
+dbConnect = 'dbname=vpostmaster'
+
+import string, sys, os, syslog
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+
+force = 0
+if len(sys.argv) > 1 and sys.argv[1] == '--force': force = 1
+
+#  connect to database
+dbConnect = vpmsupp.getConnectStr(
+                '/usr/lib/vpostmaster/etc/wwwdb.conf')
+connection = vpmsupp.connectToDb(dbConnect)
+cursor = connection.cursor()
+
+#  set the values
+cursor.execute('SELECT mailmanbindir FROM meta')
+row = cursor.fetchone()
+if force or not row[0]:
+	print 'Updating mailmanbindir'
+	for testfile, destdir in [
+			( '/usr/lib/mailman/bin/newlist', '/usr/lib/mailman/bin' ),
+			]:
+		if os.path.exists(testfile):
+			cursor.execute('UPDATE meta SET mailmanbindir = %s', ( destdir, ))
+
+cursor.execute('SELECT mailmanvardir FROM meta')
+row = cursor.fetchone()
+if force or not row[0]:
+	print 'Updating mailmanvardir'
+	for testfile, destdir in [
+			( '/var/lib/mailman/lists', '/var/lib/mailman' ),
+			]:
+		if os.path.exists(testfile):
+			cursor.execute('UPDATE meta SET mailmanvardir = %s', ( destdir, ))
+
+cursor.execute('SELECT mailmanmailcmd FROM meta')
+row = cursor.fetchone()
+if force or not row[0]:
+	print 'Updating mailmanmailcmd'
+	for testfile, destdir in [
+			( '/usr/lib/mailman/mail/mailman', None ),
+			]:
+		if os.path.exists(testfile):
+			cursor.execute('UPDATE meta SET mailmanmailcmd = %s', ( testfile, ))
+
+connection.commit()
+cursor.close()
+connection.close()

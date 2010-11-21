@@ -1,0 +1,4 @@
+vpm-wwwhelper now will call user-defined "add" and "delete" scripts in
+      addition to the normal add/delete code.  Scripts are under
+      /usr/lib/vpostmaster/etc/wwwhelper.d/{useradd,userdel}, and are run
+      in order.  (Developed for Adams Internet)

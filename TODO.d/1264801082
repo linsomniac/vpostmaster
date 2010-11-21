@@ -1,0 +1,4 @@
+Enabling sa-update to run daily.  CentOS systems provide a script at
+   /etc/cron.d/sa-update which runs /usr/share/spamassassin/sa-update.cron.
+   Debian and Debian-based systems don't appear to have this same setup by
+   default and may benefit from having it added with vpostmaster installs.

@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# (c) 2005, 2006 tummy.com, ltd.
+# vPostMaster release script
+#
+#  Run when the .tar file is created, updates the build files.
+#
+#  Red Hat and Debian directory should be named vpostmaster-[VERSION]
+#     i.e. vpostmaster-1.00
+#  Ubuntu directory should be named vpostmaster-[VERSION]ubuntu[SUBVERSION]
+#     i.e. vpostmaster-1.00ubuntu1
+
+echo "Updating packaging files"
+dir=`pwd`
+rev=${dir##*-}
+
+#  Ubuntu specific changes
+if [ -f /etc/lsb-release ] && [ -f /etc/debian_version ]
+then
+	. /etc/lsb-release
+	rev=${rev%%ubuntu*}
+	#  modify changelog to indicate Ubuntu
+	dch -D $DISTRIB_CODENAME -v "$rev-ubuntu1" 'Debian synchronization.'
+fi
+
+for spec in *.spec
+do
+	cp "${spec}" "${spec}.old"
+	sed 's/^%define version.*/%define version '"$rev"'/' "${spec}.old" >"${spec}"
+	rm -f "${spec}.old"
+done
+
+if basename `pwd` | grep -q vpostmaster-2; then
+	mv debian/changelog-commercial debian/changelog
+fi
+chmod 755 debian/rules
+sed -i "s/.*\$GLOBALS\\['vpm_version'\\] = '1.00';\$/   \$GLOBALS['vpm_version'] = '${rev}';/g" vpostmaster-www/version.php
+rm -f BUILDNOTES*
+rm -f DEVELNOTES*
+[ -f "License-Community.html" ] && \
+		sed -i "s/@@release@@/`date +'%A %B %d, %Y'`/" License-Community.html
+[ -f "License-Pro.html" ] && \
+		sed -i "s/@@release@@/`date +'%A %B %d, %Y'`/" License-Pro.html
+
+chmod 755 scripts/*
+scripts/joinparts WHATSNEW.d >WHATSNEW
+
+rm -rf WHATSNEW.d TODO.d
+
+#  checking indentation
+NANNY=
+for file in /usr/lib/python*/tabnanny.py
+do
+	[ -f "$file" ] && NANNY=$file
+done
+if [ ! -f "$NANNY" ]
+then
+	echo "Unable to find tabnanny executable"
+	exit 1
+fi
+"$NANNY" vpm-wwwhelper vpm-dbupgrade vpm-pfpolicy vpm-pftransport \
+		vpm-pgmaintain vpmsupp.py vpmuser
+if [ "$?" -ne 0 ]
+then
+	echo "*** Tabnanny boo-hooing, aborting."
+	exit 1
+fi
+
+echo '***********************'
+echo "Don't forget to update"
+echo "   /home/httpd/updates.vpostmaster.com/html/currentversion.txt"
+echo '***********************'

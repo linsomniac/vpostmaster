@@ -1,0 +1,270 @@
+================================
+Version 1.24 -- Mon Feb 13, 2006
+
+More documentation from Evelyn Mitchell for the web interface.
+Fixing the handling of extension addresses.
+Adding vim folding codes to some parts of the code where it was missing.
+Pass system meta-data to the message processing code.
+Updating schema to version 7.
+Importing psycopg into vpmsupp for use in exception handling.
+      Fixes a traceback during greylist handling.  Reported by MTWAfrica.
+Added X-Original-To: and Delivered-To: headers.
+
+================================
+Version 1.22 -- Mon Dec 19, 2005
+
+Splitting out the version string from code.php into version.php.
+Fixing a permissions problem with the wwwdb.conf file.  The default setting
+      was causing problems with the vpm-wwwhelper generating a warning on
+      the creation of a new user:
+         Error while calling useradd helper: [...] IOError: [Errno 13]
+         Permission denied: '/usr/lib/vpostmaster/etc/wwwdb.conf'
+         NOTE: Helper errors leave user in partially added state. You will
+         need to delete and re-create the user after resolving the problem.
+Making list views more pretty with colorized odd rows.
+
+================================
+Version 1.20 -- Fri Dec 09, 2005
+
+Control script updates for Debian and Ubuntu.
+No changes for Fedora, just rolling to have the same version for RPM and
+      Debian systems.
+
+================================
+Version 1.18 -- Wed Dec 07, 2005
+
+Nataraj pointed out that if enabled, greylisting in transport is
+      quarantining under some unexpected circumstances.  I've changed it to
+      only quarantine in transport when the greylisting action is
+      quarantine.
+Removing the wwwdb.conf from the package and putting the conf-dist file in
+      /usr/share/doc
+Quarantined messages are no longer forwarded to users in the forward list.
+      Local delivery is done to the quarantine folder, whether "local
+      delivery" is set or not, but forwarding is ignored.
+Added popup help documentation to the Settings pages. Questions, comments
+      and more examples appreciated. Send to efm-vpostmaster@tummy.com.
+      Evelyn Mitchell
+Brian Cairns reported a NotImplemented exception was logged for his system.
+      That should only be reported when a ClamAV action that is
+      unrecognised is seen, and may indicate a bad value in the database.
+      I changed the exception to a ValueError with information about the
+      action that was requested, to make debugging easier.
+Added a link to the mailing list on vpostmaster web interface menu.
+Scott Kleihege found a problem with wwwhelper when running from vpmuser.
+      It now reads the connect information from wwwdb.conf.
+RPM spec file now will run vpm-dbupgrade on upgrades.
+RPM spec file now restarts postfix on an upgrade.
+The RPM spec file was reverting the main.cf mail_name back to Postfix on
+   any subsequent upgrade.  Fixed.
+Removing the wwwdb.conf file from RPM packaging.  If your file goes
+      missing, you will need to run:
+         mv /usr/lib/vpostmaster/etc/wwwdb.conf.rpmsave \
+            /usr/lib/vpostmaster/etc/wwwdb.conf
+      to repair it.
+Update check now displays a different message when a development version is
+      being used.
+adminuser_view was validating name differently than adminuser_create.  An
+      admin user with digits in their name couldn't be updated because of
+      this.
+
+================================
+Version 1.16 -- Thu Nov 03, 2005
+
+Found a bug in the resolveUser() function where it wouldn't properly
+      resolve a local user to the destination account.
+Spam subject prefix was getting added to non-spam messages.  (Reported by
+      Aron Shtull Trauring)
+Debugging information added to Greylisting checker.  (Patch contributed by
+      Nataraj)
+Greylisting would, for all remote message, update the greylist database
+      entry twice, once during SMTP and once during delivery.  Nataraj
+      contriuted a patch which only does the update if a previous update
+      has not been done recently.  This will reduce database activity for
+      heavily active users.
+Web interface now shows the current version next to "Control Panel".
+      (Suggested by Ted Clark)
+Nataraj found a bug where postfix would, in the policy, pass a null sender,
+      but in the transport would have changed it to
+      "mailer-daemon@<domain>".  This caused greylisting to get confused
+      and quarantine messages that had made it past greylisting.
+Fixing a corrupted image.
+If a ".procmailrc" file exists in a user home directory, procmail will be
+      called to deliver the message for local folder delivery.  Note that
+      you will need to explicitly set the DEFAULT variable in your
+      procmailrc for delivery.
+vpmuser is now using a connect string instead of the running user's
+      privileges.
+Moving vpm-pgmaintain into the "bin" directory from the "postfix"
+      directory.
+The schema now changes table ownership to "vpostmaster".
+The vpostmaster password was not getting saved in the setup script.
+Web UI: Fields entered as "0" were sometimes treated as blank.  Fixed.
+vpm-pfpolicy now traps and logs it's exceptions, since postfix does not.
+Allow SpamAssassin to re-write the headers of the message.
+Allow users to select if spam status headers should be added to the
+      message during delivery.
+Allow users to specify a subject prefix if the message is believed to be
+      spam.
+Greylisting did not work when set to quarantine.  Fixed.  Found by
+      code-review.
+Changing the form validation in PHP to make better error descriptions in
+      cases where the field is empty but required and for character limits.
+SpamAssassin action can now include "accept" to unconditionally accept a
+      message.
+Allow SpamAssassin threshold to go down as low as -30.
+Adding accessibility changes to help visually-impaired users.  Suggested by
+      Raul A. Gallegos, largely implemented by Evelyn Mitchell.
+Multiple simultaneous deiveries to the same box may result in a database
+      concurrency error in the greylist table.  Trap and ignore this error.
+
+================================
+Version 1.15 -- Wed Oct 12, 2005
+
+Fixing a problem where users with quotas set cannot update their account
+      settings and password because it exceeds their quota.  Reported by
+      Raul A. Gallegos.
+Changing the order of rule checks to: Envelope Rules, SPF, Greylist,
+      ClamAV, SpamAssassin.
+Changes to the web UI so that it is more obvious when an account is set up
+      such that it discards all incoming e-mail.
+Fixing a bug where the previous user selected still shows after creating a
+      new domain.
+Some loop optimizations for checking envelope rules.
+Added regex envelope rules.  Prefix a rule with "regex:" to make it a
+      regex, and "normal:" or no prefix to make it a normal string comparison.
+All envelope rules which do not start with "regex" are now converted
+      to lower-case in the web management interface.
+Added a set of defaults for new systems.
+Forward-only accounts in web interface were showing forward+local.
+If incoming messages are *ONLY* being forwarded to a single other local
+      vpostmaster address, internal "redirection" will happen instead of
+      external forwarding.  This means that the destination accounts
+      rules constrain the delivery.
+Display the number of active users per domain, suggested by Joel Hoornbeek.
+If checkers return anything but success, log it with DEBUG status.
+Optional debugging of rules.  Currently, you have to modify vpmsupp.py
+      so the "self.debug = debug" line reads "self.debug = 2" (or 1 for
+      less debugging).
+Fixing the regex for detecting locally generated messages.
+      Reported by Ken Weinert.
+Adding clamav to requirements in the spec file.
+Converting the addresses to lower-case in vpm-pftransport.
+      Fix supplied by Nataraj.
+Added a status message about quarantining messages, suggested by Nataraj.
+Fix for quick double insertions into the greylist database.
+      Problem reported by Nataraj.
+Modified the checkers to result in "DUNNO" if some of their required values
+      are not set.  Problem reported by Nataraj.
+Adding "permit_mynetworks" to recipient restrictions.
+      Reported by Ken Weinert.
+
+================================
+Version 1.14 -- Tue Jun 28, 2005
+
+Resolving a bug where some SPF checks on domains which had no SPF record
+      would reject all incomging mail from that domain.
+Added debian startup script to replace saslauthd required symlink in
+      /var/run that was removed by a different debian startup script.
+
+================================
+Version 1.13 -- Mon Jun 20, 2005
+
+Fixing a bug in checking the return-code from SPF, which sometimes wouldn't
+      detect SPF telling it to abort.  Reported by Scott Kleihege
+Changed the spec file so pre and post scripts always succeed.
+Built Debian Unstable and Ubuntu Hoary Hedgehog packages.
+Fixing setup-fc3 script so that it does the right config change for
+      PostgreSQL version 8 and above.
+
+================================
+Version 1.12 -- Sun May 16, 2005
+
+Adding instructions for the SquirrelMail configuration.
+The RPM now configures squirrelmail correctly.  Reported by Joel Hoornbeek.
+Removing the unused checkboxes in the user lookup, and showing
+      account forwarding information.  Reported by Joel Hoornbeek.
+User list now also shows account type (forward only, forward+local, local).
+Fixing a spec problem with FC2 not pulling the right dovecot release.
+
+================================
+Version 1.11 -- Sun May 01, 2005
+
+Forward field can now include multiple addresses.
+Changed the way local lookups are done for greylisting to quarantine.
+Greylisting and SPF is now disabled for messages from 127.0.0.1 or
+      messages locally forwarded.  Forwarded messages should be checked
+      on the incoming account that forwards, not the destination account.
+
+================================
+Version 1.09 -- Fri Apr 29, 2005
+
+A bug in the local delivery caused 1.08 to fail on delivery.
+Changed the post-install script to ignore the failure of the grep.
+
+================================
+Version 1.08 -- Wed Apr 27, 2005
+
+Trap exception when SPF fails.  Reported by Roger May.
+
+================================
+Version 1.07 -- Fri Apr 22, 2005
+
+Changing install process to set mail_name to vPostMaster
+Adding instructions for FC2.
+Removed the "Conflicts: postfix" from the spec file, relying on
+      postfix+pgsql to conflict.
+Adding the line "vpm-pftransport_destination_recipient_limit = 1" to
+      main.cf in the install scripts and instructions.  This fixes a bug
+      where multiple recipients in the same domain were causing a bounce.
+      Reported by Eric Swanson
+
+================================
+Version 1.06 -- Thu Mar 17, 2005
+
+Improperly quoting the Forward To field caused SQL Errors on user create
+      where Forward To was set.
+Validation problem with Forward To field (reported by Tom Rhymes).
+Setting system defaults was not properly clearing out the previous data.
+
+================================
+Version 1.05 -- Mon Mar 14, 2005
+
+Fixing the quoting of the /etc/sysconfig/saslauthd settings, reported by
+      Tom Rymes.
+
+================================
+Version 1.04 -- Fri Mar 04, 2005
+
+Fixing a problem in the INSTALL and setup-fc3 scripts which prevented SMTP
+   AUTH from being set up properly.  Please see the post to the mailing list
+   (http://lists.tummy.com/mailman/listinfo/vpostmaster) for more information
+   on fixing it.
+
+================================
+Version 1.03 -- Sun Feb 20, 2005
+
+Includes code to look up greylist-incompatible hosts which send non-spam
+      messages.
+Man page for "vpmuser".
+Added the beginnings of a database conversion script for use when doing
+      updates.
+
+================================
+Version 1.02 -- Sun Feb 13, 2005
+
+Adding a command-line tool for adding and removing users, "vpmuser".
+Checkers in the transport are now called for both local and remote messages.
+      Should reduce confusion, it confused me.
+Changed the schema for Dovecot so that disabled users or users in disabled
+      domains cannot login.
+Fixed the INSTALL instructions based on review and changes to the SQL for
+      detecting deactivated users and domains.
+Making the wwwhelper chown the directories that are created if they are
+      created as root.  Command-line tool may be run as root.
+Changed the user_create quota form field.
+
+================================
+Version 1.00 -- Tue Feb 08, 2005
+
+Initial release.

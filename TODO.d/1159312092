@@ -1,0 +1,3 @@
+Make it so that you can do the subject marking while still delivering
+      message to normal Inbox.  Currently, you either have to disable
+      SpamAssassin, it will not mark it as spam.  Suggested by Joe Black.

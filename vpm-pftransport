@@ -1,0 +1,385 @@
+#!/usr/bin/env python
+#
+# (c) 2005, 2006 tummy.com, ltd.
+#
+#  Postfix transport for delivering vPostMaster messages
+
+dbConnect = 'dbname=vpostmaster'
+
+import string, sys, os, time, syslog, re
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+
+###########################################################################
+def rewriteHeaders(tmpFile, status, reason, spamSubjectPrefix, addHeaders):#{{{1
+	destFile = tmpFile + '.tmp'
+	infp = open(tmpFile, 'r')
+	outfp = open(destFile, 'w')
+
+	#  performance improvements
+	readline = infp.readline
+	read = infp.read
+	write = outfp.write
+	strip = string.strip
+	lower = string.lower
+
+	#  copy header
+	while 1:
+		line = readline()
+		if not line or not strip(line): break
+
+		#  rewrite subject
+		if spamSubjectPrefix and lower(line[:8]) == 'subject:':
+			if line[8] == ' ': line = line[:9] + spamSubjectPrefix + line[9:]
+			else: line = line[:8] + spamSubjectPrefix + line[8:]
+
+		#  write data
+		write(line)
+	
+	#  write extra headers
+	for line in addHeaders:
+		write(line)
+		write('\n')
+	write('\n')
+	
+	#  copy body
+	while 1:
+		data = read(4096)
+		if not data: break
+		write(data)
+
+	#  move into place
+	infp.close()
+	outfp.close()
+	os.rename(destFile, tmpFile)
+
+
+##############################################################
+def deliverLocal(userData, maildirName, destMailDir, tmpFile):  #{{{1
+	newFile = os.path.join(destMailDir, 'new', maildirName)
+	syslog.syslog('Local delivery to "%s"' % newFile)
+	os.rename(tmpFile, newFile)
+	return(1)
+
+
+#################################################################
+def deliverProcmail(userData, maildirName, destMailDir, tmpFile):  #{{{1
+	#  set up environment
+	os.environ['VPOSTMASTER_HOME'] = userData['userdir']
+	os.environ['VPOSTMASTER_DEFAULT'] = destMailDir
+
+	#  call procmail delivery
+	procmailFile = os.path.join(userData['userdir'], '.procmailrc')
+	ret = os.system('procmail -p "%s" <"%s"' % ( procmailFile, tmpFile ))
+	if ret != 0 and ret != None:
+		syslog.syslog('Local delivery via procmail failed: return code: %s'
+				% ret)
+		os.remove(tmpFile)
+		return(0)
+
+	#  clean up after delivery  {{{2
+	syslog.syslog('Local delivery via procmail')
+	os.remove(tmpFile)
+	return(1)
+
+
+################################################################
+def doLocalDelivery(userData, destMailDir, maildirName, tmpFile, #{{{1
+		force = 0):
+	#  if local delivery is disabled, return success  {{{2
+	if not force and not userData.get('localdeliveryenabled'):
+		return(( 'DROPPED', 1 ))
+
+	#  set up destination maildir  {{{2
+	newDir = os.path.join(userData['userdir'], destMailDir, 'new')
+	if not os.path.exists(newDir):
+		try: os.makedirs(newDir)
+		except ( OSError, IOError ):
+			#  may happen if multiple processes try it at the same time
+			pass
+		for extdir in ( 'cur', 'tmp' ):
+			dir = os.path.join(userData['userdir'], destMailDir, extdir)
+			if not os.path.exists(dir):
+				try: os.makedirs(dir)
+				except ( OSError, IOError ):
+					#  may happen if multiple processes try it at the same time
+					pass
+
+	#  detect delivery mechanism  {{{2
+	procmailName = os.path.join(userData['userdir'], '.procmailrc')
+	deliveryAgent = deliverLocal
+	if os.path.exists(procmailName):
+		deliveryAgent = deliverProcmail
+
+	#  deliver  {{{2
+	return(( 'STATUS', deliveryAgent(userData, maildirName,
+			os.path.join(userData['userdir'], destMailDir), tmpFile) ))
+
+
+##########################################
+def deliverToCommand(tmpFile, file, args):  #{{{1
+	try:
+		oldStdin = os.dup(0)
+		fd = os.open(tmpFile, os.O_RDONLY)
+		os.dup2(fd, 0)
+		ret = os.spawnvp(os.P_WAIT, file, args)
+		os.close(fd)
+		os.dup2(oldStdin, 0)
+
+		#  report results {{{3
+		if ret != 0:
+			errorMessage = 'Forwarding returned %s instead of 0' % ret
+			return(errorMessage)
+	#  system error while forwarding message {{{3
+	except (IOError, OSError), e:
+		return(repr(e))
+
+	return(None)
+
+
+##################################################################
+def doForward(userData, destMailDir, maildirName, tmpFile, sender,  #{{{1
+		metaData):
+	forwardTo = userData.get('forwardto')
+	if not forwardTo:
+		return(( 'DROPPED', None ))
+
+	errorMessage = None
+	forwardsSucceeded = 0
+	for forwardAddress in string.split(forwardTo):
+		if 1:  #  place-holder for other delivery mechanisms
+			#  gateway to sendmail wrapper {{{3
+			args = ( 'sendmail', '-oi', '-r', sender, '-f', sender,
+					'--', forwardAddress )
+			msg = deliverToCommand(tmpFile, '/usr/sbin/sendmail', args)
+			if msg == None:
+				syslog.syslog('Forwarded to "%s"' % forwardAddress)
+				forwardsSucceeded = forwardsSucceeded + 1
+			else:
+				syslog.syslog(msg)
+				syslog.syslog('Running with args: "%s"' % repr(args))
+
+	#  return status  {{{2
+	if forwardsSucceeded: return(( 'SUCCESS', errorMessage ))
+	else: return(( 'FAILED', errorMessage ))
+
+
+################################################################
+def deliver(userData, destMailDir, maildirName, tmpFile, sender,  #{{{1
+		forward, local, metaData):
+	if forward:
+		fwdStatus, errorMessage = doForward(userData, destMailDir, maildirName,
+				tmpFile, sender, metaData)
+	else:
+		fwdStatus = 'DROPPED'
+		errorMessage = None
+	if local:
+		localForce = local == 'FORCE'
+		localStatus, successfulDelivery = doLocalDelivery(userData, destMailDir,
+				maildirName, tmpFile, localForce)
+	else:
+		localStatus = 'DROPPED'
+		successfulDelivery = 0
+
+	#  clean up the tmp file if it still exists  {{{2
+	if os.path.exists(tmpFile):
+		os.remove(tmpFile)
+
+	#  no delivery specified  {{{2
+	if fwdStatus == 'DROPPED' and localStatus == 'DROPPED':
+		syslog.syslog('Dropping, no delivery destination configured.')
+		return(0)
+
+	#  successful delivery  {{{2
+	if ((fwdStatus == 'DROPPED' or fwdStatus == 'SUCCESS') and
+			(localStatus == 'DROPPED' or
+				(localStatus == 'STATUS' and successfulDelivery))):
+		return(0)
+
+	#  delivery failure  {{{2
+	syslog.syslog('No delivery successfully completed.  Returning tempfail.  '
+			'fwdStatus="%s" errorMessage="%s" localStatus="%s" '
+			'successfulDelivery="%s"'
+			% ( fwdStatus, errorMessage, localStatus, successfulDelivery ))
+	if errorMessage == None:
+		errorMessage = ('See mail log file or contact system administrator for'
+				' more informaiton.')
+	print 'Both delivery and forwarding failed:  ' + errorMessage
+	return(75)  #os.EX_TEMPFAIL
+
+
+##################################################
+def processMessage(cursor, connection, debug = 0):  #{{{1
+	'Process incoming message for delivery.'
+	#  process arguments  {{{2
+	if len(sys.argv) != 3:
+		print 'usage: %s <sender> <recipient>' % os.path.basename(sys.argv[0])
+		return(1)
+	sender = string.lower(sys.argv[1])
+	recipient = string.lower(sys.argv[2])
+
+	#  get meta information from database  {{{2
+	cursor.execute('SELECT * FROM meta LIMIT 1')
+	metaData = vpmsupp.dictfetchone(cursor)
+	if not metaData:
+		sys.stderr.write('ERROR: The "meta" table seems to be empty!  '
+				'This is a serious configuration error.\n')
+		return(1)
+
+	#  get information on user from database  {{{2
+	try:
+		( recipientLocal, recipientDomain, domainData,
+				userData ) = vpmsupp.lookupRecipient(cursor, connection,
+				recipient, debug = debug)
+	except vpmsupp.InvalidRecipientException, e:
+		print 'Invalid recipient "%s": %s' % ( recipient, e.reason )
+		return(1)
+
+	#  set up main maildir  {{{2
+	destMailDir = 'Maildir'
+	tmpDir = os.path.join(userData['userdir'], destMailDir, 'tmp')
+	os.umask(077)
+	if not os.path.exists(tmpDir):
+		os.makedirs(tmpDir)
+		for extdir in ( 'cur', 'new' ):
+			dir = os.path.join(userData['userdir'], destMailDir, extdir)
+			if not os.path.exists(dir):
+				os.makedirs(dir)
+
+	#  copy message to tmp directory  {{{2
+	maildirName = vpmsupp.makeMaildirName()
+	tmpFile = os.path.join(tmpDir, maildirName)
+	fp = open(tmpFile, 'w')
+	read = sys.stdin.read
+	write = fp.write
+
+	#  discard the "From " line.
+	fromLine = sys.stdin.readline()
+	if fromLine[:5] != 'From ': write(fromLine)
+
+	#  add headers
+	write('X-Original-To: %s\n' % recipient)
+	write('Delivered-To: %s@%s\n' % ( recipientLocal, recipientDomain ))
+
+	#  copy message from stdin
+	data = read(10240)
+	firstBlock = data
+	while 1:
+		if not data: break
+		write(data)
+		data = read(10240)
+	fp.close()
+
+	#  synthetic values  {{{2
+	synthetic = {}
+	synthetic['size'] = str(os.stat(tmpFile).st_size)
+	synthetic['sender'] = sender
+	synthetic['recipient'] = recipient
+	synthetic['message_file'] = tmpFile
+
+	#  process the first received line  {{{2
+	receivedType = 'unknown'
+	for line in string.split(firstBlock, '\n'):
+		if line[:9] != 'Received:': continue
+
+		#  remote receipt  {{{3
+		m = re.match(r'^Received:\s+from\s+(\S+)\s+\((\S+)\s+\[([\d.]+)\]\)\s*$',
+				line)
+		if m:
+			receivedType = 'remote'
+			groups = m.groups()
+			synthetic['helo_name'] = groups[0]
+			synthetic['client_name'] = groups[1]
+			synthetic['client_address'] = groups[2]
+			break
+
+		#  local receipt  {{{3
+		m = re.match(r'^Received:\s+by\s+(\S+)\s+\((Postfix|vPostMaster)(,'
+				r'\s+from\s+userid\s+\d+\))?\s*$',
+				line)
+		if m:
+			receivedType = 'local'
+			synthetic['helo_name'] = None
+			synthetic['client_name'] = 'localhost'
+			synthetic['client_address'] = '127.0.0.1'
+			break
+
+		#  unknown delivery  {{{3
+		syslog.syslog('Unknown received line: "%s"' % line)
+		break
+
+	#  call checkers  {{{2
+	status, reason, addHeaders = vpmsupp.checkClass(debug = debug).runCheck(
+			cursor, connection, synthetic, domainData, userData, 'delivery')
+
+	#  get values for modifying headers
+	doAddSpamHeaders = (string.lower(userData.get('addspamheaders', ''))
+			== 'enabled')
+	spamSubjectPrefix = userData.get('spamsubjectprefix')
+	if userData.get('addspamheaders') == 'enabled':
+		if reason: addHeaders.insert(0, 'X-vPostMaster-Reason: %s' % reason)
+		addHeaders.insert(0, 'X-vPostMaster-Status: %s' % status)
+	else:
+		addHeaders = []
+
+	#  regular delivery  {{{2
+	if status == 'OK':
+		#  @@@ external folder delivery would get set up here
+		#  modify headers
+		if doAddSpamHeaders:
+			rewriteHeaders(tmpFile, status, reason,
+					spamSubjectPrefix = '', addHeaders = addHeaders)
+
+		deliver(userData, destMailDir, maildirName, tmpFile, sender, forward = 1,
+				local = 1, metaData = metaData)
+		return(0)
+
+	#  drop  {{{2
+	elif status == 'DROP':
+		os.unlink(tmpFile)
+		msg = 'Dropping due to recipient filter: %s' % reason
+		syslog.syslog(msg)
+		return(0)
+
+	#  reject  {{{2
+	elif status == 'REJECT':
+		os.unlink(tmpFile)
+		msg = 'Rejecting due to recipient filter: %s' % reason
+		print msg
+		return(69)  #os.EX_UNAVAILABLE
+
+	#  quarantine  {{{2
+	else:
+		#  modify headers
+		if doAddSpamHeaders or spamSubjectPrefix:
+			rewriteHeaders(tmpFile, status, reason,
+					spamSubjectPrefix = spamSubjectPrefix, addHeaders = addHeaders)
+
+		#  deliver to quarantine
+		destMailDir = os.path.join(destMailDir, '.Quarantine')
+		msg = 'Message was quarantined: status="%s", reason="%s"' % ( status,
+				reason )
+		print msg
+		deliver(userData, destMailDir, maildirName, tmpFile, sender, forward = 0,
+				local = 'FORCE', metaData = metaData)
+		return(0)
+
+	raise ValueError, 'Uncaught status: "%s"' % status 
+
+
+####################
+#  main program body {{{1
+debug = vpmsupp.getDebug()
+vpmsupp.setupExceptHook()
+try:
+	connection = vpmsupp.connectToDb(dbConnect)
+except Exception, e:
+	print 'Database connection failed: "%s"' % str(e)
+	sys.exit(1)
+cursor = connection.cursor()
+ret = processMessage(cursor, connection, debug = debug)
+cursor.close()
+connection.close()
+
+sys.exit(ret)

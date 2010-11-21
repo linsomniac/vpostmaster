@@ -1,0 +1,354 @@
+#!/usr/bin/env python
+#
+# (c) 2005, 2006 tummy.com, ltd.
+# vPostMaster release script
+#
+#  Command-line program for adding/deleting users.
+
+revision = "$Revision: 280 $"
+rcsid = "$Id: vpmuser 280 2005-10-16 20:00:22Z jafo $"
+
+pathVpmHelper = '/usr/lib/vpostmaster/bin/vpm-wwwhelper'
+
+#  main code
+import sys, string, os, crypt, random, re
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+#  get database connect string
+dbConnect = vpmsupp.getConnectStr(
+		'/usr/lib/vpostmaster/etc/vpostmaster-db.conf')
+
+
+##########################################
+def doDelete(connection, cursor, options):
+	options.domainName = string.lower(options.domainName)
+	options.userName = string.lower(options.userName)
+
+	#  verify user does exist
+	cursor.execute('SELECT COUNT(id) FROM users '
+			'WHERE name = %s AND domainsname = %s', ( options.userName,
+				options.domainName ))
+	if cursor.fetchone()[0] == 0:
+		sys.stderr.write('FAILURE: This user does not exist.\n')
+		return(1)
+
+	#  deactivate user
+	try:
+		cursor.execute('UPDATE users SET active = \'f\' '
+				'WHERE name = %s and domainsname = %s',
+				( options.userName, options.domainName ))
+	except Exception, e:
+		sys.stderr.write('FAILURE: Database error while deactivating user: %s\n'
+				% str(e))
+		return(1)
+	connection.commit()
+
+	#  delete user directory
+	fp = os.popen(pathVpmHelper + ' >/dev/null', 'w')
+	fp.write('rmuser\0%s\0%s' % ( options.domainName, options.userName ))
+	ret = fp.close()
+	if ret != None:
+		sys.stderr.write('FAILURE: Helper returned "%s" while deleting users '
+			'home directory.  Note that\nthe user database entry has been '
+			'removed, but the users home directory still \nexists.\n' % ret)
+		return(1)
+	
+	#  delete user
+	try:
+		cursor.execute('DELETE FROM users WHERE name = %s and domainsname = %s',
+				( options.userName, options.domainName ))
+	except Exception, e:
+		sys.stderr.write('FAILURE: Database error while deleting user: %s\n'
+				% str(e))
+		return(1)
+	connection.commit()
+
+	#  successful
+	return(0)
+
+
+###########################################################
+def doCreate(connection, cursor, options, extraAttributes):
+	options.domainName = string.lower(options.domainName)
+	options.userName = string.lower(options.userName)
+
+	#  get domain information
+	cursor.execute('SELECT * FROM domains WHERE name = %s',
+			( options.domainName, ))
+	domainInfo = vpmsupp.dictfetchone(cursor)
+	if not domainInfo:
+		sys.stderr.write('FAILURE: Unknown domain "%s"' % options.domainName)
+		return(1)
+
+	#  verify they aren't over the max number of users
+	if domainInfo.get('maxusers'):
+		cursor.execute('SELECT count(id) FROM users WHERE domainsname = %s',
+				( options.domainName, ))
+		count = cursor.fetchone()[0]
+		if count >= domainInfo.get('maxusers', 0):
+			sys.stderr.write('FAILURE: Domain already has maximum allowed '
+					'number of users.\n')
+			return(1)
+
+	#  validate user name
+	if (domainInfo.get('extensionchar') and string.find(options.userName,
+			domainInfo.get('extensionchar')) >= 0):
+		sys.stderr.write('FAILURE: User name must not contain the domain '
+				'extension character "%s"\n' % domainInfo.get('extensionchar'))
+		return(1)
+	if not re.match(r'^[-a-z0-9.+_]+$', options.userName):
+		sys.stderr.write('FAILURE: Invalid user name "%s".  Name consist '
+				'entirely of alpha-numeric\ncharacters, ".", "+", "-" and "_".\n'
+				% options.userName)
+		return(1)
+
+	#  crypt password
+	if options.password:
+		SaltStr = ('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+				'0123456789./');
+		salt = random.choice(SaltStr) + random.choice(SaltStr)
+		options.cryptedPassword = crypt.crypt(options.password, salt)
+
+	#  check quota
+	if (domainInfo['maxperuserquota'] and (not options.quota
+			or int(options.quota) > int(domainInfo['maxperuserquota']))):
+		sys.stderr.write('FAILURE: Quota exceeds maximum domain quota of "%s".'
+				% domainInfo['maxperuserquota'])
+		return(1)
+
+	#  verify user does not exist
+	cursor.execute('SELECT COUNT(id) FROM users '
+			'WHERE name = %s AND domainsname = %s', ( options.userName,
+				options.domainName ))
+	if cursor.fetchone()[0] != 0:
+		sys.stderr.write('FAILURE: This user already exists.\n')
+		return(1)
+
+	#  make user directory name
+	cursor.execute('SELECT * FROM meta')
+	metaInfo = vpmsupp.dictfetchone(cursor)
+	if not metaInfo:
+		sys.stderr.write('FAILURE: The meta table does not exist or does not '
+				'have a record.  This is\nprobably a configuration error and '
+				'needs to be reported to the site owner.\n')
+		return(1)
+	userDirName = os.path.join(domainInfo['domaindir'], 'mailboxes')
+	if metaInfo['userdirsplit']:
+		userDirName = os.path.join(userDirName,
+				options.userName[:metaInfo['userdirsplit']])
+	userDirName = os.path.join(userDirName, options.userName)
+
+	#  enable local delivery by default
+	if options.nolocal:
+		local = 'f'
+	else:
+		local = 't'
+
+	#  set up the password
+	plaintextPassword = options.password
+	if not options.password: plaintextPassword = 'x'
+
+	#  create user
+	try:
+		if options.forward:
+			cursor.execute("INSERT INTO users "
+					"( name, domainsname, active, cryptedpasswd, plaintextpasswd, "
+					"userdir, quotainmegabytes, forwardto, localdeliveryenabled ) "
+					"VALUES ( %s, %s, 't', %s, %s, %s, %s, %s, %s )",
+					( options.userName, options.domainName, options.cryptedPassword,
+						plaintextPassword, userDirName, options.quota,
+						options.forward, local ))
+		else:
+			cursor.execute("INSERT INTO users "
+					"( name, domainsname, active, cryptedpasswd, plaintextpasswd, "
+					"userdir, quotainmegabytes, forwardto, localdeliveryenabled ) "
+					"VALUES ( %s, %s, 't', %s, %s, %s, %s, NULL, %s )",
+					( options.userName, options.domainName, options.cryptedPassword,
+						plaintextPassword, userDirName, options.quota, local ))
+	except Exception, e:
+		sys.stderr.write('FAILURE: Database error while adding user: %s\n'
+				% str(e))
+		return(1)
+	connection.commit()
+
+	#  add extra attributes
+	cursor.execute('SELECT id FROM users WHERE name = %s AND '
+			'domainsname = %s', ( options.userName, options.domainName ))
+	userId = cursor.fetchone()[0]
+	for key, value in extraAttributes:
+		cursor.execute('SELECT id FROM extraattributes WHERE name = %s', ( key, ))
+		row = cursor.fetchone()
+		if not row:
+			print 'ERROR: Invalid attribute "%s"' % key
+			return(1)
+		attributeId = row[0]
+		cursor.execute('INSERT INTO extrasettings '
+				'( usersid, attributesid, value_text ) '
+				'VALUES ( %s, %s, %s )', ( userId, attributeId, value ))
+		connection.commit()
+
+	#  set up domain defaults
+	cursor.execute('SELECT domaindefaults.key AS key, '
+			'domaindefaults.value AS value '
+			'FROM domaindefaults, domains '
+			'WHERE domains.name = %s '
+			'AND domaindefaults.domainsid = domains.id',
+			( options.domainName, ))
+	defaults = cursor.fetchall()
+	for ( key, value ) in defaults:
+		cursor.execute('INSERT INTO usersettings ( usersid, key, value ) '
+				'VALUES ( %s, %s, %s )', ( userId, key, value ))
+	connection.commit()
+
+	#  create user directory
+	fp = os.popen(pathVpmHelper + ' >/dev/null', 'w')
+	fp.write('newuser\0%s\0%s' % ( options.domainName, options.userName ))
+	ret = fp.close()
+	if ret != None:
+		sys.stderr.write('FAILURE: Helper returned "%s" while creating users '
+			'home directory.  Note that\nthe user database entry has been added, '
+			'but the users home directory may not\nexist.  An incoming e-mail '
+			'message should create the users directory, but\nuntil then the user '
+			'may receive errors while checking their mail.\n' % ret)
+		return(1)
+
+	#  successful
+	return(0)
+
+
+###########################
+#  load the optparse module
+try:
+	import optparse
+except ImportError:
+	import optik
+	optparse = optik
+
+#  parse options
+parser = optparse.OptionParser(version = string.split(revision)[1])
+parser.add_option('--domain',
+	dest = 'domainName', default = None,
+	help = 'Name of domain to manipulate user in.',
+	metavar = 'DOMAIN_NAME')
+parser.add_option('--user',
+	dest = 'userName', default = None,
+	help = 'User name to work on.',
+	metavar = 'USER_NAME')
+parser.add_option('--password',
+	dest = 'password', default = None,
+	help = 'Password of user, used when creating a new user.',
+	metavar = 'PASSWORD')
+parser.add_option('--quota',
+	dest = 'quota', default = None, type = 'int',
+	help = 'Quota for user in megabytes.',
+	metavar = 'QUOTA_IN_MB')
+parser.add_option('--crypted-password',
+	dest = 'cryptedPassword', default = None,
+	help = 'Password, already encrypted using the Unix "crypt" mechanism.',
+	metavar = 'CRYPTED_PASSWORD')
+parser.add_option('-e', '--environment',
+	dest = 'useEnvironment', action = 'store_true',
+	help = 'Get domain, user, and password information from the environment.  '
+			'Settings in the environment take precedence over the command-line.')
+parser.add_option('--create',
+	dest = 'actionCreate', action = 'store_true',
+	help = 'ACTION: Create the specified user.')
+parser.add_option('--delete',
+	dest = 'actionDelete', action = 'store_true',
+	help = 'ACTION: Delete the specified user.')
+parser.add_option('--forward',
+	dest = 'forward', default = '',
+	help = 'Forward address.  Should be the full email address of the '
+			'recipient.',
+	metavar = 'FORWARD_ADDRESS')
+parser.add_option('--nolocal',
+	dest = 'nolocal', action = 'store_true',
+	help = 'Disable local delivery.  For disabling local storage when using '
+			'a forward address.')
+options, args = parser.parse_args()
+
+#  load the environment into the options
+extraAttributes = []
+if options.useEnvironment:
+	#  VPMACTION
+	if os.environ.get('VPMACTION'):
+		action = os.environ.get('VPMACTION')
+		if string.lower(action) == 'create':
+			options.actionDelete = 0
+			options.actionCreate = 1
+		elif string.lower(action) == 'delete':
+			options.actionDelete = 1
+			options.actionCreate = 0
+		else:
+			sys.stderr.write('FAILURE: Unknown VPMACTION "%s"\n' % action)
+			sys.exit(1)
+
+	#  other values
+	for key in os.environ.keys():
+		for envName, optName in [
+				( 'VPMDOMAIN', 'domainName' ),
+				( 'VPMUSER', 'userName' ),
+				( 'VPMPASSWORD', 'password' ),
+				( 'VPMCRYPTEDPASSWORD', 'cryptedPassword' ),
+				( 'VPMQUOTA', 'quota' ),
+				( 'VPMFORWARD', 'forward' ),
+				( 'VPMNOLOCAL', 'nolocal' ),
+				]:
+			if key == envName:
+				value = os.environ.get(key)
+				if envName == 'VPMQUOTA':
+					try: value = int(value)
+					except ValueError:
+						sys.stderr.write('FAILURE: VPMQUOTA must be an integer '
+								'value.\n')
+						sys.exit(1)
+				setattr(options, optName, os.environ.get(envName))
+		if key[:9] == 'VPMEXTRA_':
+			extraAttributes.append(( string.lower(key[9:]), os.environ.get(key) ))
+
+#  check options
+if options.actionDelete and options.actionCreate:
+	sys.stderr.write('FAILURE: Both "Create" and "Delete" options specified.\n')
+	sys.exit(1)
+if not options.actionDelete and not options.actionCreate:
+	sys.stderr.write('FAILURE: --create or --delete option must be specified.\n')
+	sys.exit(1)
+if not options.actionDelete and not options.actionCreate:
+	sys.stderr.write('FAILURE: --create or --delete option must be specified.\n')
+	sys.exit(1)
+if options.actionCreate:
+	if (not options.domainName or not options.userName
+			or not (options.password or options.cryptedPassword)):
+		sys.stderr.write('FAILURE: --domain, --user, and one of --password or '
+				'--crypted-password\nmust be specified with --create.\n')
+		sys.exit(1)
+	if options.password and options.cryptedPassword:
+		sys.stderr.write('FAILURE: Only one of --password or --crypted-password '
+				'must be specified\n');
+		sys.exit(1)
+if options.actionDelete:
+	if (not options.domainName and not options.userName):
+		sys.stderr.write('FAILURE: --domain and --user must be specified with '
+				'--delete\n')
+		sys.exit(1)
+	if options.password or options.cryptedPassword:
+		sys.stderr.write('FAILURE: Neither --password or --crypted-password '
+				'may be specified with\n--delete.\n');
+		sys.exit(1)
+
+#  take action
+vpmsupp.setupExceptHook()
+connection = vpmsupp.connectToDb(dbConnect)
+cursor = connection.cursor()
+if options.actionDelete:
+	ret = doDelete(connection, cursor, options)
+if options.actionCreate:
+	ret = doCreate(connection, cursor, options, extraAttributes)
+cursor.close()
+connection.close()
+
+#  return
+if ret == 0:
+	print 'SUCCESSFUL'
+sys.exit(ret)

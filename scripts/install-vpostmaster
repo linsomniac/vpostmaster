@@ -1,0 +1,407 @@
+#!/bin/bash
+#
+#  Script which takes care of the steps required for installing
+#  vPostMaster.
+
+#  run as root
+if [ "$UID" -ne 0 -a "$1" != --force ]
+then
+   echo "This script must be run as root."
+   exit 1
+fi
+
+####################################
+function vpm_remove_mail_servers_rpm
+{
+   echo "*** Removing existing mail server(s)..."
+   if [ -f /etc/init.d/sendmail ]
+   then
+      [ -f /etc/init.d/sendmail ] && /etc/init.d/sendmail stop
+      rpm -e --nodeps sendmail
+   fi
+   if [ -d /etc/postfix ]
+   then
+      [ -f /etc/init.d/postfix ] && /etc/init.d/postfix stop
+      rpm -e --nodeps postfix
+      mv /etc/postfix /etc/postfix.before-vpostmaster
+   fi
+}
+
+###############################
+function vpm_firewall_setup_rpm
+{
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 25 -j ACCEPT
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 110 -j ACCEPT
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 143 -j ACCEPT
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 993 -j ACCEPT
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 995 -j ACCEPT
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 80 -j ACCEPT
+   /sbin/iptables-save >/etc/sysconfig/iptables
+}
+
+#############################
+function add_apt_sources_list
+{
+   OSTYPE="$1"
+   case $OSTYPE in
+      Debian-5.0)
+         echo "deb http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/stable /" \
+            >>/etc/apt/sources.list
+         echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/stable /" \
+            >>/etc/apt/sources.list
+         ;;
+      Debian-4.0)
+         echo "deb http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/etch /" \
+            >>/etc/apt/sources.list
+         echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/etch /" \
+            >>/etc/apt/sources.list
+         ;;
+      Debian-3.1)
+         echo "deb http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/sarge /" \
+            >>/etc/apt/sources.list
+         echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/sarge /" \
+            >>/etc/apt/sources.list
+         ;;
+      Ubuntu-10.04|Ubuntu-8.04)
+         echo "deb http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/ubuntu/$DISTRIB_CODENAME /" \
+            >/etc/apt/sources.list.d/vpostmaster.list
+         echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/ubuntu/$DISTRIB_CODENAME /" \
+            >>/etc/apt/sources.list.d/vpostmaster.list
+         ;;
+      Ubuntu-6.10|Ubuntu-6.06|Ubuntu-5.10)
+         echo "deb http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/ubuntu/$DISTRIB_CODENAME /" \
+            >>/etc/apt/sources.list
+         echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/ubuntu/$DISTRIB_CODENAME /" \
+            >>/etc/apt/sources.list
+         echo "Enabling Universe repositories"
+         sed -i 's/.*deb\(.*\)http:\(.*\)universe$/deb\1http:\2universe/' \
+            /etc/apt/sources.list
+         ;;
+      *)
+         echo "Unsupported OSTYPE: $OSTYPE"
+         echo "Aborting..."
+         exit 1
+   esac
+}
+
+#  warn the user
+cat <<@EOF
+**************************************************************************
+Welcome to the vPostMaster install script.  This script will complete the
+process of installing vPostMaster on your system.
+
+WARNING: This process completely re-configures your e-mail system.
+If you have an existing e-mail server on this system, it's configuration
+may be removed or overwritten.  If this system is the primary mail server
+for any domains, mail may be lost or bounced back to the sender until
+you complete the configuration and testing of vPostMaster.
+
+WARNING: If this system has any existing data, particularly related to
+e-mail, which want to keep, it is recommended that you have a good set of
+backups before doing this installation.
+
+@EOF
+while true;
+do
+   echo -n 'Are you sure you want to continue?  [n/y] '
+   read input
+   if [ "$input" == n -o "$input" == N ]
+   then
+      echo "Aborting at user request..."
+      exit 1
+   fi
+   [ "$input" == y -o "$input" == Y ] && break
+done
+
+#  check for commercial version
+FLAVOR=public
+REPO_USER_STRING=""
+REPO_COMMERCIAL_STRING=""
+echo
+while true;
+do
+   echo -n 'Do you want to install the Pro version (requires password)? [y/n] '
+   read input
+   [ "$input" == n -o "$input" == N ] && break
+   [ "$input" != y -a "$input" != Y ] && continue
+   FLAVOR=pro
+   cat <<@EOF
+
+The Pro version requires a username and password assigned from
+tummy.com, ltd.  if you selected this option by mistake, please press
+Control-C to break out of the install program and start again.  Otherwise,
+enter the information below.
+@EOF
+   while true;
+   do
+      echo -n 'vPostMaster Username: '
+      read PRO_USERNAME
+      echo -n 'vPostMaster Password: '
+      read PRO_PASSWORD
+      echo
+      echo "Username: '$PRO_USERNAME'"
+      echo "Password: '$PRO_PASSWORD'"
+      echo -n 'Is this correct? [y/n] '
+      read input
+      [ "$input" != y -a "$input" != Y ] && continue
+      REPO_USER_STRING="${PRO_USERNAME}:${PRO_PASSWORD}@"
+      REPO_COMMERCIAL_STRING="-commercial"
+      break
+   done
+   break
+done
+
+#  find out what kind of system
+OSTYPE=""
+METHOD=""
+if [ -f /etc/redhat-release ]
+then
+   grep -q 'Fedora Core release 6' /etc/redhat-release \
+         && OSTYPE=FC-5 && METHOD=yum
+   grep -q 'Fedora Core release 5' /etc/redhat-release \
+         && OSTYPE=FC-5 && METHOD=yum
+   grep -q 'Fedora Core release 4' /etc/redhat-release \
+         && OSTYPE=FC-4 && METHOD=yum
+   grep -q 'Fedora Core release 3' /etc/redhat-release \
+         && OSTYPE=FC-3 && METHOD=yum
+   grep -q 'Fedora Core release 2' /etc/redhat-release \
+         && OSTYPE=FC-2 && METHOD=yum
+   grep -q 'CentOS release 4' /etc/redhat-release \
+         && OSTYPE=CentOS-4 && METHOD=yum
+   grep -q 'CentOS release 5' /etc/redhat-release \
+         && OSTYPE=CentOS-5 && METHOD=yum
+   egrep -q 'Red Hat Enterprise [[:alpha:] ]*4 ' /etc/redhat-release \
+         && OSTYPE=RHEL-4 && METHOD=up2date
+fi
+if [ -f /etc/debian_version ]
+then
+   grep -q '5.0' /etc/debian_version && OSTYPE=Debian-5.0 && METHOD=apt
+   grep -q '4.0' /etc/debian_version && OSTYPE=Debian-4.0 && METHOD=apt
+   grep -q '3.1' /etc/debian_version && OSTYPE=Debian-3.1 && METHOD=apt
+   grep -q '3.0' /etc/debian_version && OSTYPE=Debian-3.0 && METHOD=apt
+fi
+if [ -f /etc/lsb-release ]
+then
+   . /etc/lsb-release
+   export DISTRIB_CODENAME
+   case "$DISTRIB_CODENAME" in
+      lucid)
+         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+         ;;
+      hardy)
+         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+         ;;
+      edgy)
+         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+         ;;
+      dapper)
+         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+         ;;
+      breezy)
+         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+         ;;
+      breezy)
+         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+         ;;
+   esac
+fi
+
+#  system-specific code
+case "$METHOD" in
+   ##############################
+   yum)
+      #  write /etc/yum.repos.d file
+      if [ ! -d /etc/yum.repos.d ]
+      then
+         echo "Yum doesn't seem to be configured on this system."
+         echo "The vPostMaster install expects to use yum."
+         exit 1
+      fi
+      echo "*** Setting up /etc/yum.repos.d/vpostmaster.repo..."
+      cd /etc/yum.repos.d
+      if [ "${OSTYPE%%-*}" = FC ]
+      then
+         echo "[vpostmaster]" >vpostmaster.repo
+         echo "name=vPostMaster Repository" >>vpostmaster.repo
+         echo "baseurl=http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/fedora/\$releasever/i386/" >>vpostmaster.repo
+         echo "enabled=1" >>vpostmaster.repo
+         echo "gpgcheck=1" >>vpostmaster.repo
+      else
+         echo "[vpostmaster]" >vpostmaster.repo
+         echo "name=vPostMaster Repository" >>vpostmaster.repo
+         echo "baseurl=http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/centos/\$releasever/\$basearch/" >>vpostmaster.repo
+         echo "enabled=1" >>vpostmaster.repo
+         echo "gpgcheck=1" >>vpostmaster.repo
+
+         echo "*** Setting up EPEL repository..."
+         if [ "${OSTYPE##*-}" -eq 4 ]
+         then
+            rpm -Uvh http://download.fedora.redhat.com/pub/epel/4/`uname -i`/epel-release-4-9.noarch.rpm
+         elif [ "${OSTYPE##*-}" -eq 5 ]
+         then
+            rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/`uname -i`/epel-release-5-3.noarch.rpm
+         fi
+      fi
+
+      echo "*** Loading required RPM keys..."
+      rpm -qi gpg-pubkey-95ccbcff-3fdce47c >/dev/null 2>&1 || \
+            rpm --import ftp://ftp.tummy.com/pub/tummy/RPMS/KRUD-GPG-KEY
+      if [ "${OSTYPE%%-*}" = CentOS ]
+      then
+         for FILE in \
+               /usr/share/doc/centos-release-*/RPM-GPG-KEY-centos* \
+               /usr/share/doc/centos-release-*/RPM-GPG-KEY \
+               http://download.fedora.redhat.com/pub/epel/RPM-GPG-KEY-EPEL
+         do
+            [ -f "$FILE" ] || continue
+            rpm --import "$FILE"
+         done
+      fi
+
+      #  Remove mail servers
+      vpm_remove_mail_servers_rpm
+
+      #  yum install vpostmaster
+      echo "*** Installing vPostMaster, this may take several minutes."
+      yum -y install postgresql-server mailman
+      yum -y install cyrus-sasl-plain
+      yum -y install vpostmaster
+      chkconfig mailman on
+
+      #  Install clamav-update
+      echo "*** Installing clamav-update, this *MAY* fail without problems."
+      yum -y install clamav-update
+      [ -f /etc/freshclam.conf ] && \
+            sed -i 's/^Example/#Example/' /etc/freshclam.conf
+
+      #  scripts/setup-fc3
+      echo "*** Performing post-install setup..."
+      echo "+++ See /var/log/setup-vpostmaster.out for details."
+      /usr/lib/vpostmaster/bin/setup-fc3 >/var/log/setup-vpostmaster.out 2>&1
+
+      #  fix firewall
+      echo "*** Opening firewall for mail server..."
+      vpm_firewall_setup_rpm
+      ;;
+
+   ##############################
+   up2date)
+      #  write /etc/sysconfig/rhn/sources file
+      if [ ! -f /etc/sysconfig/rhn/sources ]
+      then
+         echo "up2date doesn't seem to be installed on this system."
+         echo "The vPostMaster install expects to use up2date on RHAS."
+         exit 1
+      fi
+      echo "*** Setting up /etc/sysconfig/rhn/sources..."
+      if ! grep -q '^yum vpostmaster ' /etc/sysconfig/rhn/sources
+      then
+         UP2DATE_REPO_USER_STRING=`echo ${REPO_USER_STRING} | tr ':@' '..'`
+         echo '' >>/etc/sysconfig/rhn/sources
+         echo '# vPostMaster Repository' >>/etc/sysconfig/rhn/sources
+         echo yum vpostmaster \
+            http://${UP2DATE_REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/centos/4/i386/ \
+            >>/etc/sysconfig/rhn/sources
+      fi
+
+      echo "*** Loading required RPM keys..."
+      rpm -qi gpg-pubkey-95ccbcff-3fdce47c >/dev/null 2>&1 || \
+            rpm --import ftp://ftp.tummy.com/pub/tummy/RPMS/KRUD-GPG-KEY
+
+      #  Remove mail servers
+      vpm_remove_mail_servers_rpm
+
+      #  install vpostmaster
+      echo "*** Installing vPostMaster, this may take several minutes."
+      up2date -di vpostmaster postgresql-server mailman
+      chkconfig mailman on
+
+      #  scripts/setup-fc3
+      echo "*** Performing post-install setup..."
+      echo "+++ See /var/log/setup-vpostmaster.out for details."
+      /usr/lib/vpostmaster/bin/setup-fc3 >/var/log/setup-vpostmaster.out 2>&1
+
+      #  fix firewall
+      echo "*** Opening firewall for mail server..."
+      vpm_firewall_setup_rpm
+      ;;
+
+   ##############################
+   apt)
+#      cat <<@EOF
+#
+#WARNING: This script will disable SSL encryption of connections to the
+#postgresql server.  If users connect to the database server from remote
+#hosts, their authentication information and data may pass over the network
+#in plain-text.
+#
+#@EOF
+#      echo -n 'Do you wish to continue? [y/n] '
+#      read input
+#      [ "$input" == n -o "$input" == N ] && exit 1
+
+      if grep -q 'yum1.tummy.com/vpostmaster' /etc/apt/sources.list
+      then
+         echo "*** Already found vpostmaster in /etc/apt/sources.list"
+      else
+         echo "*** Adding vpostmaster sources to /etc/apt/sources.list"
+         echo >>/etc/apt/sources.list
+         echo '# tummy.com repository for vpostmaster' >>/etc/apt/sources.list
+         add_apt_sources_list $OSTYPE
+         [ "$?" -ne 0 ] && exit 1
+      fi
+
+      echo "*** Installing vpostmaster via apt..."
+      cat <<@EOF
+NOTE: During the install process you may be asked questions about
+configuring several of the packages that vpostmaster will install.
+For most of the screens, you will be able to accept the defaults.
+Assuming that you have a medium message level for apt-get, the
+configuration screens ought to approximately follow the steps below:
+
+   + 3 postgresql configuration screens, if in doubt accept the defaults
+   + 3 mailman configuration screens, on the second screen, you must
+       select at least one language to support (using the spacebar)
+
+Press ENTER after you have read the above.
+@EOF
+      read line
+
+      PGVER=postgresql
+      case "$OSTYPE" in
+         Ubuntu-6.06|Ubuntu-6.10)
+            PGVER=postgresql-8.1
+            ;;
+         Ubuntu-7.04)
+            PGVER=postgresql-8.2
+            ;;
+         Ubuntu-8.04)
+            PGVER=postgresql-8.3
+            ;;
+         Ubuntu-10.04)
+            PGVER=postgresql-8.4
+            ;;
+      esac
+      dpkg -l|egrep 'ii *postgresql-?[0-9\.]* ' >/dev/null 2>&1 && \
+            unset PGVER
+      wget -O - -q http://yum1.tummy.com/vpostmaster/ubuntu/deb-vpm.key | apt-key add -
+      apt-get update
+      apt-get install $PGVER squirrelmail mailman vpostmaster
+
+      #  scripts/setup-debian
+      echo "*** Performing post-install setup..."
+      echo "+++ See /var/log/setup-vpostmaster.out for details."
+      /usr/lib/vpostmaster/bin/setup-debian >/var/log/setup-vpostmaster.out 2>&1
+      ;;
+
+   ##############################
+   *)
+      echo "This system is running an OS which is not supported by this"
+      echo "script.  This may mean that only a manual install is supported"
+      echo "currently.  Please contact tummy.com, ltd.  (http://www.tummy.com/)"
+      echo "and let us know the OS you are trying to run this on."
+      exit 1
+      ;;
+esac
+
+#  display password and management URL?

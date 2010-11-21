@@ -1,0 +1,4 @@
+Accounts without local delivery enabled and forwarding to a single
+      domain which is not in the current vPostMaster system will receive an
+      error at SMTP time that the domain does not exist.
+      Reported by tummy.com Mail Server Monitoring System.

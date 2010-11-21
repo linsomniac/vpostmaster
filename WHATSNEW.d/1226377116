@@ -1,0 +1,2 @@
+Added checks to updateto10 and updateto11 to check if already been run.  
+      Added vpm-dbupgrade step to distribution-specific setup scripts.

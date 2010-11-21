@@ -1,0 +1,54 @@
+Migrating from vpopmail to vPostMaster
+Sean Reifschneider, <jafo@tummy.com>
+======================================
+
+vPostMaster now includes a program called "vpm-cpvpopmail", which automates
+the process of copying users from a vpopmail setup to vPostMaster.  This
+script has the following requirements:
+
+   It depends on unencrypted passwords in the "vpasswd" files.  This is the
+   last field on the line of the vpasswd files.
+
+   It will only migrate "forward" entries which start with "&" (forward to
+   the following address).  It will report and ignore entries starting with
+   anything else.
+
+   Obviously, the destination system must have vPostMaster installed on it.
+
+It is recommended that the migration be done with vPostMaster installed on
+a new host.  Migration should work with vPostMaster installed on the
+existing vpopmail server, but you may run into conflicts between the
+vPostMaster install and software from vpopmail.  vpopmail and qmail should
+be removed (with the exception of /home/vpopmail and it's sub-directories)
+before vPostMaster is installed.
+
+You should have verified, known good backups before doing a migration,
+especially a single-machine migration, where you want to switch a vpopmail
+system to vPostMaster.
+
+USAGE
+
+   You need to have a copy of /home/vpopmail/domains/ directories for any
+   domain you wish to migrate on the vPostMaster server.
+
+   Before running vpm-cpvpopmail, you should first:
+
+      Install vPostMaster.
+
+      Log into the web management interface.
+
+      Set up the defaults your new users will get (System->Defaults).
+
+      Create the domains you wish to have copied (Domains->Create).
+
+   vpm-cpvpopmail can be run with the following command:
+
+      /usr/lib/vpopmail/bin/vpm-cpvpopmail <DOMAIN NAME> [...]
+
+   In other words, run the program listing one or more domains to copy from
+   vpopmail.  This will copy users from the /home/vpopmail/domains
+   directories on the local machine into vPostMaster.  Typically, these
+   would be copied via rsync from your existing vpopmail mail server to the
+   new vPostMaster mail server, before running vpm-cpvpopmail.  See warning
+   above about installing vPostMaster on an already running vpopmail
+   server.

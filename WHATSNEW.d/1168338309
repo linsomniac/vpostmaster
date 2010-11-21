@@ -1,0 +1,1 @@
+Fixing .spec code that adds vPostMaser to mailman group on upgrade of RPMs.

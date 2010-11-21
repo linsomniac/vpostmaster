@@ -1,0 +1,2 @@
+Fixed a bug in vpmuser that prevented it from deleting users via the
+      environment option. (Developed for Adams Internet)

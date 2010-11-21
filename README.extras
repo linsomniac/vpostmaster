@@ -1,0 +1,32 @@
+Using ExtraSettings with vPostMaster
+Sean Reifschneider, <jafo@tummy.com>
+======================================
+
+Extra settings are values that the system administrator can set which are
+set on a per-user basis.  These values are not used by the mail system at
+all, directly, and can be used for administrative or other functions.
+
+Extra settings show up in the user management page, and are only able to be
+changed by a system or domain administrator.
+
+Extra Settings are controlled by the "extraattributes" database, for
+example:
+
+ id |     name     |  class  |         description          |    label
+----+--------------+---------+------------------------------+--------------
+  1 | 50_is_dialup | BOOLEAN | Is this user a dial-up user? | Dial-up User
+
+This example shows a "is_dialup" attribute which shows up under the web
+interface as "Dial-up User" with a help text of "Is this user a dial-up
+user?" (on the right side of the web interface).  The control type is a
+checkbox.
+
+The "class" supports "BOOLEAN" (checkbox) and "TEXT" (normal text fields).
+
+The fields are presented in the form in PostgreSQL sort order based on the
+"name" column above.  So, you may want to name things starting with a
+couple of leading digits, so that you can later insert things above or
+below it in the sort order.
+
+WARNING:  The name field may only contain numbers, lower-case letters,
+and underscores, and be no more than 32 characters in length.

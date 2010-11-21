@@ -1,0 +1,6 @@
+If multiple spamassassin thresholds were set to the same value, the
+      lexigraphically smallest one was selected.  So if both "quarantine"
+      and "disabled" were set to the same threshold, disabled would be
+      selected.  Now disabled ones are completely ignored, and if multiple
+      thresholds are the same, the one appearing earlier in the web
+      interface is used.  Reported by JW.

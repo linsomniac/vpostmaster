@@ -1,0 +1,3 @@
+Adding code to assign user spam settings based on default domain 
+      settings when running vpmuser.  Also updated the database schema 
+      to give required permissions.

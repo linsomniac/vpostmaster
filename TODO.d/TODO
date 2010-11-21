@@ -1,0 +1,149 @@
+Change mydestination so that it doesn't have "$myhostname" in it:
+   mydestination = localhost.$mydomain, localhost
+
+If a user forwards a message to themselves, and have local delivery on, the
+message will be delivered 49 times and then a bounce sent.
+
+Change install instructions to have users send an install report to us
+after the installation is complete, similar to what DJB does.
+
+Precedence in user_rules.php allow 3 digits, limit to 0-99.
+
+Set up spam blocking of messages from domains which remote IP don't match
+      domain name.  Examples:
+         Return-Path: <anonymous@www2.serverroom.us>
+         Received: from www2.serverroom.us (unknown [216.128.72.163])
+         From: Bank of America <service@bankofamerica.com>
+         --
+Address books, including shared/domain/global books.
+   Using LDAP I imagine, would have to see what various clients support.
+Add web interface for limiting users who can use IMAP.
+On domain create, optionally allow creating postmaster and abuse accounts,
+      with optional forwarding to another account.  Suggested by Raul A.
+      Gallegos.  Per discussion:
+
+      > What about having the "domain create" page have an option for creating
+      > these accounts as forward accounts to another address?  Like have a text
+      > field where they could enter where to forward to, possibly with a button
+      > for the second two that would enable "the same as postmaster"?
+
+      I like that. It sounds like it would work. Also, seems like it would be
+      the easiest way to do it now that I think of it.
+Make the setup script change the SpamAssassin configuration so that it uses
+      "-x" instead of "-c" so that it doesn't read per-user configs.
+Allow envelope rules to be specified for both domains and globally.
+Update the INSTALL document for vpm-pgmaintain and for setting up
+      /usr/lib/vpostmaster/etc/vpostmaster-db.conf
+"Apply defaults to all users" button in domain defaults.
+"Apply defaults to all users" button in system defaults?
+Make the command-line user-add pick up domain defaults.
+Create a job that will purge old quarantine messages.
+Add "user.php" help documentation and un-comment link from header.php
+Show disc space usage reports for a user and for a domain.
+      Probably will require a superuser helper.
+Have a SpamAssassin action which just tags the subject.
+Make spamassassin action which, below a certain level will deliver mail.
+   So, an "accept" action, which could be triggered at 0 or -10 or something.
+Auto-responder and vacation mail.
+Regex matches against headers in the rules code.
+Regex matches against the body in the rules code.
+Write documentation about backing up the system.
+Script to change the various passwords.
+Write some architecture documentation about changing Postfix and how
+      vpostmaster integrates with Postfix.
+Option to strip mime attachments on a folder?
+vpmuser connects to the database as root, should use the appropriate auth
+      privs.
+
+Check to see if FC system is logging messages like this, and if so have the
+RPM create the directory and/or file:
+   >Aug 24 10:43:39 kweinert spamd[16037]: info: setuid to vpostmaster
+   >succeeded
+   >Aug 24 10:43:39 kweinert spamd[16037]: Creating default_prefs
+   >[/usr/lib/vpostmaster/.spamassassin/user_prefs]
+   >Aug 24 10:43:40 kweinert spamd[16037]: Cannot write to
+   >/usr/lib/vpostmaster/.spamassassin/user_prefs: No such file or
+   >directory
+   >Aug 24 10:43:40 kweinert spamd[16037]: Couldn't create readable
+   >default_prefs for [/usr/lib/vpostmaster/.spamassassin/user_prefs]
+
+Switch to a different PySPF:
+   Date: Monday July 25, 2005 15:41
+   Remote IP Address: 68.100.117.70
+   Name: Stuart Gathman
+   Organization: Business Management Systems
+   Email: stuart@bmsi.com
+   contact_email: on
+   check_opensourcesoftware: on
+   QuestionOrComment:
+      The wayforward.net version of SPF hasn't been
+         maintained.  There are maintained versions
+         tracking the official draft RFC standard on
+         http://sourceforge.net/projects/pymilter
+
+      The milter package contains a version that is
+         API compatible with the wayforward version
+         1.6, but tracks the standard.  The permerror
+         result is returned as unknown, and temperror
+         as error.
+
+      The pyspf package is developed independently
+         from the milter package, and is gaining a
+         revised API, for instance, no longer
+         returning recommended SMTP code, and using
+         the RFC result names (permerror and
+         temperror).  It aims to be a stand alone
+         package for use by all Python email
+         software.
+
+      Both packages support the new official type99
+         SPF records as well as backward compatible
+         TXT records, and parse all mechanisms before
+         beginning evaluation so as to return PermErr
+         for syntax errors as early as possible.
+
+      We welcome feed back on the pyspf package, and
+         hope we can standardize on one Python SPF
+         implementation.
+
+
+Fix errors reported by lintian in debian version
+W: vpostmaster: package-contains-upstream-install-documentation usr/share/doc/vpostmaster/INSTALL.gz
+E: vpostmaster: shell-script-fails-syntax-check ./usr/lib/vpostmaster/bin/setup-debian
+E: vpostmaster: init.d-script-does-not-implement-required-option /etc/init.d/vpostmaster restart
+E: vpostmaster: init.d-script-does-not-implement-required-option /etc/init.d/vpostmaster force-reload
+E: vpostmaster: file-in-usr-marked-as-conffile /usr/lib/vpostmaster/etc/wwwdb.conf
+
+Scott: setup debian/ubuntu repositories properly to support pinning.
+Scott: get gpg-key verification enabled during install for ubuntu/apt 0.6
+
+Change the name of the fc3 script to fc (so as not to confuse fc4 users)
+
+The headers on the www pages are not consistently aligned with the
+'vpostmaster' logo, or the development/new version notice. They should all
+be in the same place.
+
+Some errors need to be reported to the site owner. Setup some way of
+sending email to that person by clicking a button on the error pages. efm
+can create the submit error form, if there is a way to retrieve the site
+owner email address.
+
+Make it easier to create aliases for an account when the account is
+created.  For example, add a field which takes a comma-separated list of
+aliases to create at the same time, and create accounts with those names at
+the same time as the main account is created.
+
+Suggestions from Craig Isdahl (used imail)
+	Ability to setup an account which receives copies of all messages
+	for the domain, like an auto copy, BCC that a normal user can't
+	remove.  For archival or managment review purposes.
+
+	Proactive quota notification to the user.  If a user is within
+	10 or 20% of quota limit, send them an email so that they can clean
+	up before messages start bouncing.
+
+	More integration with Squirrelmail, possibly through squirrelmail
+	plugins.  Links between squirrelmail and vpostmaster interfaces
+	would be nice, a single sign-on would be even better.
+
+	Improved mailman administration.

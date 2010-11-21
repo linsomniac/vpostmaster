@@ -1,0 +1,142 @@
+.TH vpmuser 8 "2005-02-19" vPostMaster "vPostMaster mail user maintenance"
+
+.SH NAME
+vpmuser \- vPostMaster mail user maintenance command-line interface.
+
+.SH SYNOPSIS
+
+.B vpmuser
+[\fIACTION\fR] [\fIOPTION\fR]...
+
+.SH DESCRIPTION
+
+.PP
+.B vpmuser
+is a program which can be used to add or delete users from the
+command-line, a script, or an automated billing system.  Data can be passed
+either on the command-line or via environment variables.
+
+.SH ACTIONS
+
+.TP
+\fB\-\-create\fR
+Create a new user.
+
+.TP
+\fB\-\-delete\fR
+Delete an existing user.
+
+.SH OPTIONS
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Display a brief usage message and exit.
+
+.TP
+\fB\-\-version\fR
+Display the program CVS version and exit.  Note that this almost certainly
+will be different from the version of vPostMaster installed.
+
+.TP
+\fB\-\-user\fR[=\fIUSER\fR]
+The name of the user (create or delete).
+
+.TP
+\fB\-\-domain\fR[=\fIDOMAIN\fR]
+The name of the domain the the user is in (create or delete).
+
+.TP
+\fB\-\-password\fR[=\fIPASSWORD\fR]
+An unencrypted password to be associated with the user.  Note that other
+users on the system where this command is run can probably see the full
+list of arguments, so this may reveal the account information to others.
+Using the environment or crypted password options is preferred.
+This will be encrypted before being used, and is simply a convenience
+for the user.  Unencrypted passwords are not stored by the system.
+(create)
+
+.TP
+\fB\-\-crypted-password\fR[=\fIPASSWORD_IN_CRYPTED_FORMAT\fR]
+The user password in standard Unix "crypt" format.  (create)
+
+.TP
+\fB\-\-quota\fR[=\fIQUOTA_IN_MEGABYTES\fR]
+The size of the user's quota in megabytes.  (create)
+
+.TP
+\fB\-e\fR, \fB\-\-environment\fR
+Read values for quota, password, user and domain names from the environment
+instead of from the command-line.  Values in the environment will
+supersede values on the command-line, if both are specified.
+
+.SH ENVIRONMENT
+.PP
+The action and user information options may be specified by passing them in
+the environment instead of via command-line options.  On some systems, the
+environment may be more difficult for arbitrary other users on the system
+to read, and may also be easier for some scripts to pass data via.  The
+environment also is not subject to shell expansion and may limit exposure
+to certain attacks.
+.PP
+The following values may be passed in the environment:
+
+.TP
+\fBVPMACTION\fR
+The action, either "create" or "delete".
+
+.TP
+\fBVPMDOMAIN\fR
+Domain name of the account to act on.  (create and delete)
+
+.TP
+\fBVPMUSER\fR
+User name to act on.  (create and delete)
+
+.TP
+\fBVPMPASSWORD\fR
+Unencrypted password.  This will be encrypted before being used, and is
+simply a convenience for the user.  Unencrypted passwords are not stored by
+the system.  (create)
+
+.TP
+\fBVPMCRYPTEDPASSWORD\fR
+Unix format encrypted password.  (create)
+
+.TP
+\fBVPMQUOTA\fR
+Quota in megabytes.  (create)
+
+.SH EXAMPLES
+
+.PP
+To create a new mail user named "alice@example.com":
+
+.TP
+.nf
+   vpmuser --create --user=alice --domain=example.com --password=mypass
+.fi
+
+.PP
+To delete the above user:
+
+.nf
+   vpmuser --delete --user=alice --domain=example.com
+.fi
+
+.PP
+To create a user using the environment:
+
+.nf
+   export VPMUSER=alice
+   export VPMDOMAIN=example.com
+   export VPMPASSWORD=mypass
+   export VPMQUOTA=10
+   vpmuser --environment
+.fi
+
+.SH ENVIRONMENT
+This software works with the vPostMaster mail system
+(http://www.tummy.com/Products/vpostmaster/).
+
+.SH AUTHOR
+Sean Reifschneider (jafo@tummy.com) of tummy.com, ltd.

@@ -1,0 +1,43 @@
+vPostMaster README
+(c) 2005, 2006 tummy.com, ltd.
+Website: http://www.tummy.com/
+Website: http://www.tummy.com/Products/vpostmaster/
+info@tummy.com
+
+LICENSE
+
+   vPostMaster is free for non-commercial use in non-commercial
+   environments, and 30-day trials.  Please see the vPostMaster web site
+   for purchasing and other information.  A "LICENSE" file is included
+   with details of the license.
+
+INTRODUCTION
+
+   vPostMaster is a full-featured, easy to install and maintain system for
+   handling virtual mail domains with Postfix.  It provides an extremely
+   comprehensive set of features including Webmail, POP, IMAP, SMTP,
+   SMTP AUTH, SSL versions of the above, virtual e-mail domains, spam
+   and virus filtering, user-controlled mail rules, SPF, Greylisting,
+   SpamAssassin, ClamAV, White/Black lists, and more.
+
+   Users are able to control their own spam, filter, and mailbox settings,
+   on an individual basis.  In other words, you don't have to disable
+   greylisting for your entire domain just because a single user wants
+   it disabled.
+
+   Domains and users are set up in such a way that system user accounts
+   are not required for mail access, preventing mail users from gaining
+   access to the system.
+
+   A web-based control panel is installed which allows superusers to
+   create new domains and users, domain admins to manage users, and
+   users to manage their own spam and mail system settings.  In this
+   way, a vPostMaster administrator may delegate management of users
+   and domains to third parties.
+
+   More information can be found at:
+      http://www.tummy.com/Products/vpostmaster/
+
+PROCMAIL DELIVERY
+
+   

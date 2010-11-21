@@ -1,0 +1,2 @@
+Fixing "global name 'dbConnect' is not defined" traceback when using
+      psycopg instead of psycopg2.

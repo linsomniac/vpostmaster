@@ -1,0 +1,6 @@
+Changing the schema to version 8.
+Changing the domain defaults for "clamavaction" to "disabled" and
+      "spfaction" to "reject".  "enabled", what they were before, is not a
+      valid choice, so new users were having weird disconnects between what
+      the web interface said and how the software acted.
+

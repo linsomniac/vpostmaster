@@ -1,0 +1,443 @@
+* Help screen needed on initial login page
+   - where do I find the login?
+      The login comes up on any page load where you aren't logged in.
+      Therefore, if you are on a page and want to see the login, just click
+      on the Logout button.
+   - what do I do first?
+      Create domain, probably.  Having the top page include some
+      suggestions for what they might want to do would be good, but I don't
+      know when I'll be able to get to it.
+   - what do I do next?
+      Suggestions?
+
+* Public bugzilla
+   At the moment, I'd like to just use the mailing list, but maybe at some
+   point I'll set up a virtual and we can put Trac or something on it.
+
+* There is a specific set of steps you need to do  when first setting up
+vpostmaster
+   - set system defaults
+   - create domain
+   - review/set domain default prefs
+   - create mail user within domain
+   - review/set per user prefs (optional)
+   - verify mail works
+      - send test message
+      - retrieve test message via webmail
+      - retrieve test message via pop3
+      - retrieve test message via imap
+   Q. Are there any default users added? (postmaster?) or should they be
+   created in the initial setup?
+   - create superuser (admin)
+   - create domain admin user
+   - set up forwarding of postmaster@domain to regularly read account
+   - Optional configuration
+      - disable pop3
+      - disable imap
+      - disable webmail 
+   - How to look at the logs if there is a problem
+      - pointer to what to look for
+   
+   TODO:
+      Review system defaults 
+         postcondition
+            opened system defaults page
+            no changes are necesary
+      Set up domain  
+         postcondition
+            opened domain setup page
+            created domain
+            have domain entry in database
+      Set up user @ domain
+         precondition
+            domain created
+         postcondition
+            opened user create page
+            created user@domain
+            have user@domain entry in database
+      Test email
+         precondition
+            user@domain created
+         postcondition
+            Successfully sent and received email for user@domain
+     
+
+* Set up for testing
+   - domain already at another site
+   - test this user@domain
+      - input email address  (no default)
+      - input password
+      - report failures
+      - attempt to pick up mail with the email/pw combo
+
+* Release notes page needs more work
+
+
+System Defaults
+   SMTP Phase
+      system_defaults_clamav
+      ClamAV
+         ClamAV Anti-virus engine. Scans the body of email messages
+         for viruses. This option identifies the action which is
+         taken on messages which match virus signatures. "Drop" is the
+         default. ...more
+
+         system_defaults_clamav_action_Disabled
+         Disabled
+            Email is not scanned for viruses.
+            You may want to choose this option if you are certain that your
+            email users computers are not vunerable to email delivered
+            viruses because they have their own virus scanners, or if you have
+            a high volume of email deliveries and your email server can't
+            keep up with the load.
+
+         system_defaults_clamav_action_Drop
+         Drop
+            Recommended. Default.
+            An email message which is identified as containing a virus is
+            discarded without notifying the sender or the recipient.  This
+            is the recommended ClamAV setting because most viruses are sent
+            with forged or invalid From addresses.
+
+            The message receipt has been logged in the system mail
+            logs. If you believe a message is getting improperly dropped,
+            the mail system administrator can see if it was dropped via
+            ClamAV in the system mail logs. The mail log should also
+            contain how ClamAV classified the email (as clean or as
+            virus containing and the identified virus).
+
+         system_defaults_clamav_action_Quarantine
+         Quarantine
+            An email message which is identified as containing a virus is
+            placed in the user's Quarantine folder (IMAP and Webmail). In the
+            case of POP3, the folder is created, but the user would have to
+            use IMAP or Webmail to access the folder.
+
+            Quarantine folders require regular maintenance to clean them
+            out. This has to be set up manually, vPostmaster doesn't
+            currently include any automatic maintenance of Quarantine
+            folders.
+
+            This setting is not a recommended setting for two reasons:
+            the maintenance requirement and the increased risk of a
+            virus getting through to a vunerable computer.
+
+            The message receipt has been logged in the system mail
+            logs. If you believe a message is getting improperly
+            quarantined, the mail system administrator can see if it was
+            delivered to be scanned by ClamAV in the system mail logs. The
+            mail log should also contain how ClamAV classified the email
+            (the identified virus signature).
+
+         system_defaults_clamav_action_Reject
+         Reject (see note)
+            Not recommended.
+
+            An email message which is identified as containing a virus is
+            returned to the sender in the envelope From address.
+
+            ClamAV needs to scan the message body in order to identify
+            viruses.  If the email message contains a virus, and Reject is
+            set, a rejection mail message will be sent back to the address
+            in the envelope From header.  This means your server has to
+            accept the mail, and resend it to the envelope From sender. If
+            the envelope From sender is a forged or invalid address,
+            the rejection message will either reach an innocent
+            third party, or it will bounce back to your server (double
+            bounce). Because of the increased overhead of double bounces
+            and the risk of propogating viruses to innocent recipients,
+            this is not a recommended sending.
+
+            The message receipt has been logged in the system mail
+            logs. If you believe a message is getting improperly rejected,
+            the mail server administrator can see if it was delivered
+            to be scanned by ClamAV in the system mail logs. The mail
+            log should also contain how ClamAV classified the email
+            (the identified virus signature).
+
+      system_defaults_SPF
+      SPF
+         Action taken on an SPF match. Sender Policy Framework (SPF) is an
+         authentication mechanism for email servers.  Sender Policy
+         Framework (SPF) makes it easier to identify spoofed email
+         (email with forged From addresses).
+
+         system_defaults_spf_action_Disabled
+            Disabled
+               SPF checking is not performed on incoming mail. 
+
+               SPF is a very inexpensive test to perform on incoming mail
+               because it doesn't take much server or network resources to do.
+               We recommend that you enable SPF unless you have a specific
+               reason not to enable it.  If SPF is blocking particular
+               messages which you wish to receive, it's best to whitelist
+               the sender which is having problems via the Rules settings.
+
+               vPostmaster mail servers do <b>not</b> automate the
+               configuration of your outgoing mail to use SPF.
+               To configure SPF for your outgoing e-mail, please go to <a
+               href="http://spf.pobox.com/">The SPF Homepage
+               (http://spf.pobox.com)</a> and use their wizard to create
+               the SPF record for your domain.  You will then need to set
+               it up in your DNS server.
+
+         system_defaults_spf_action_Quarantine
+            Quarantine
+
+               SPF Quarantine means that when SPF checking detects a forged
+               email address, the message is accepted by the local
+               server and delivered to the users Quarantine email folder.
+
+@@@  These three paragraphs should probably be abstracted out. and have a
+short text that links to more information.  Like "Quarantine folders are
+only available via IMAP and webmail (More information)".
+
+               An email message which doesn't pass SPF authentication
+               is placed in the user's Quarantine folder (IMAP and
+               Webmail). In the case of POP3, the folder is created, but
+               the user would have to use IMAP or Webmail to access the
+               folder.
+
+               Quarantine folders require regular maintenance to clean
+               them out. This has to be set up manually, vPostmaster
+               doesn't include any automatic maintenance of Quarantine
+               folders.  This is not a recommended setting for two
+               reasons: the maintenance requirement and the increased
+               risk of unwanted getting through.
+
+               The message receipt has been logged in the system mail logs. If
+               you believe a message is getting improperly quarantined, you can
+               see if it was delivered to be authenticated by SPF in the system
+               mail logs. The mail log should also contain how SPF
+               classified the email (rejected, passed, or not able
+               to check).
+
+         system_defaults_spf_action_Reject
+            Reject
+               Recommended. Default.
+
+               vPostmaster mail servers are NOT set up to make SPF
+               information available to the receiving email server when
+               delivering outgoing email. Please go to spf.pobox.com
+               and use the wizard there to set up SPF for your domain.
+
+               This setting only applies to handling incoming email.
+
+               SPF Reject means that when SPF checking detects a forged
+               email address, the message is not accepted by the local
+               server and the remote server must handle the bounce.
+
+               SPF checking results in three possible outcomes.
+
+               Not enough information: One is that the incoming mail
+               server domain doesn't publish an SPF record. SPF check
+               is skipped. In this case, there isn't enough information
+               to deny delivery, so the email is passed onto the next
+               stage of SMTP authorization for handling.
+
+               Forged email address detected: Another is that the incoming
+               mail server domain publishes SPF, but the the incoming
+               mail server is not listed in the SPF record. In this
+               case, when Reject is selected, the remote email server
+               is notified that the email has been rejected due to SPF
+               failure. The email is not processed further after this.
+
+               SPF check passes: And the last case is that the incoming
+               mail server domain publishes SPF and the incoming mail
+               server is on that list.  This means that mail passes this
+               stage and can be processed by the next SMTP phase.
+
+      system_defaults_greylist
+      greylist_action
+         Action taken on a greylist match. Greylisting is distinct from
+         whitelisting (always allowing email that matches a pattern) or
+         blacklisting (always banning email that matches a pattern).
+
+         Greylisting slows down delivery of mail the first time an email sender
+         attempts to deliver to an email address by returning a soft bounce
+         (please try again later) to the sending email server. 
+
+         Most legitimate email senders will respect the soft bounce and
+         retry later. Spam email senders most often do not resend. And, in
+         the case where they do retry, the time delay has allowed enough
+         time for the spam signature to be added to an RBL (realtime
+         blacklist) or to the Spamassassin database, thus preventing
+         delivery.
+         
+         Some hosts, such as Gmail and Yahoo, send from many different
+         email servers, and will retry from a different host. This means
+         that greylisting will slow delivery from these hosts repeatedly,
+         and have the practical effect of blocking email from being delivered.
+         ???Do you need to whitelist these senders?
+         ???Does vPostmaster ship with appropriately configured whitelists?
+         
+         Greylisting will have no effect on email from your regular
+         correspondants. It will have the effect of blocking email from up
+         to 80% of spammers prior to Spamassassin filtering. This can
+         significantly reduce the load on your mail server, and can make
+         the difference between being able to keep up with your email load,
+         and not being able to get email at all.
+         
+         'Disabled' disables greylisting,
+         'Quarantine' causes initial greylisted messages to be delivered to
+         your quarantine folder. 'Learn' will seed the greylist database
+         without rejecting messages. 'Enabled' fully enablesgreylisting.
+
+         system_defaults_greylist_action_Disabled
+            Greylisting is disabled.
+
+         system_defaults_greylist_action_Quarantine
+            Email that is greylisted is delivered immediately into your
+            Quarantine email folder ???without being run through
+            spamassassin???.
+
+            An email message which is greylisted is placed in the user's
+            Quarantine folder (IMAP and Webmail). In the case of POP3,
+            the folder is created, but the user would have to use IMAP
+            or Webmail to access the folder.
+
+               
+            Quarantine folders require regular maintenance to clean them
+            out. This has to be set up manually, vPostmaster doesn't
+            include any automatic maintenance of Quarantine folders.
+            This is not a recommended setting for two reasons: the
+            maintenance requirement and the increased risk of unwanted
+            getting through.
+
+            The message receipt has been logged in the system mail logs. If
+            you believe a message is getting improperly quarantined, you can
+            see if it was greylisted in the system mail logs. 
+
+         system_defaults_greylist_action_Learn
+            This is the recommended setting for a new email system for the
+            first several days. This setting builds up the greylisting
+            database of sender and receiver pairs, to learn your regular
+            correspondance patterns, without delaying any mail. Once the
+            greylisting database has been primed, you can enable
+            greylisting to slow down delivery from new correspondants.
+
+         system_defaults_greylist_action_Enabled
+            Greylisting is fully enabled. Recommended.
+
+            Greylisting delays the delivery of mail from new senders in
+            order to block spam. 
+
+            Each incoming message is looked up in the greylisting database
+            by the sender email address, the recipient email address and
+            the sending email server. If there is no record matching those
+            3 items, an entry is created, and a soft bounce (please try
+            again later) is sent back to the sending email server. If there
+            is a record matching those fields, the time is checked.
+            If the timeout has not been reached another soft bounce is
+            sent (please try to send the email again later).  If the
+            time has been longer than the greylist timeout since the
+            initial delivery attempt, the email is passed through for
+            futher processing.
+
+
+      greylist_timeout
+         Default is 60 minutes.
+         Recommend between 1 minute and 60 minutes. Should never be more
+         than 120 minutes. Messages from new senders are temporarily
+         delayed for at least this many minutes. Messages from regular
+         correspondants are not delayed. This is the earliest time that
+         mail from a new sender can be received. Mail delivery may take
+         longer than this time, depending on how frequently remote mail
+         senders attempt delivery. 
+
+         This timeout is only used if greylisting is enabled or set to
+         quarantine. If greylisting is disabled, or learning this timeout
+         has no effect.
+
+      system_defaults_spamassassin
+      spamassassin_action
+         Action taken on a Spamassassin match. 
+         Spamasssassin is rulebased email filtering software. Spamassassin
+         scores each incoming email on many different rules. Each rule has
+         a point value. Emails which match many rules receive high scores
+         and are more likely to be unwanted email. Emails which match few
+         rules or rules with low point values are less likely to be
+         unwanted email. 
+
+         You can set up 3 ranges of Spamassassin scores, and have different
+         actions for each range. Very low scoring email is most likely to
+         be legitimate, and so should be delivered. Intermediate scoring
+         email may be legitimate or it may be bad; you may want to
+         quarantine this email. High scoring email is likely to be
+         unwanted, you most likely will discard this email as spam.
+
+         Recommended threshold settings for each level are:
+            Rule 1: Quarantine > 5 
+            Rule 2: Drop > 15 
+            Rule 3 not used
+         In this setup, email which scores less than 5 will be delivered,
+         email which scores between 5 and 15 will be quarantined and email
+         which scores over 15 will be dropped.
+
+         system_defaults_spamassassin_action_Disabled
+            No Spamassassin filtering.
+            Email messages which score above the threshold for this rule
+            level (and less for the threshold for the next rule level, if
+            any) will be Quarantined.
+            ???What is the effect of having rules like:
+               Level 1: Disabled > 5
+               Level 2: Quarantine > 15
+               Level 3: Drop > 25
+            ???That is, is there a check for having a disabled rule too
+            early in the ordering?
+            ???Is there a check for having nonsense action ordering?
+   
+         system_defaults_spamassassin_action_Quarantine
+            Email messages which score above the threshold for this rule
+            level (and less for the threshold for the next rule level, if
+            any) will be Quarantined.
+            
+         system_defaults_spamassassin_action_Drop
+            Email messages which score above the threshold for this rule
+            level (and less for the threshold for the next rule level, if
+            any) will be Dropped. No notice is sent back to the sender. 
+
+            This setting should be used at higher score settings, as they
+            are most likely spam. Dropping spam email prevents innocent
+            email boxes from being flooded with rejected spam. 
+
+         system_defaults_spamassassin_action_Reject
+
+            Email messages which score above the threshold for this rule
+            level (and less for the threshold for the next rule level, if
+            any) will be Rejected. The sender is notified that their email
+            was not delivered. 
+            
+            This setting should be used at lower score settings, as they
+            are more likely to be legitimate email. At higher scores, this
+            setting will cause email to be bounced to innocent third
+            parties, as email addresses are often forged by spammers.
+
+         system_defaults_spamassassin_action_Threshold
+            A threshold is the level above which the associated level action
+            will apply. If the next highest numbered rule is enabled, this
+            threshold will apply up to that score.
+
+            Reasonable threshold levels are:
+               Rule 1: 5
+               Rule 2: 15
+               Rule 3: disabled, no threshold set
+            
+            Each of the threshold levels must be higher than the prior
+            level. ???Do you check for this? I just ran a test, and it is
+            possible to create nonsensical spamassassin thresholds.
+
+Table of the order in which rules are applied
+   SMTP
+      Envelope rules
+         Have to be set at the email user level
+      SPF
+      Greylisting
+   Email body Acceptance
+      ClamAV
+      SpamAssassin
+
+"Reset to Defaults" button.  For someone who gets confused and wants to
+start over.
+   
+      

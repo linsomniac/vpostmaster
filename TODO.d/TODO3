@@ -1,0 +1,12 @@
+Have "basic" and "advanced" configuration modes in the GUI config.
+Allow catch-all to be an arbitrary address or address list?
+Per-domain storage quota.
+Incoming mail quotas.
+Outgoing mail quotas (by SASL login?).
+Document what all the SMTP-phase errors may be.
+   Look for "InvalidRecipientException" in pfvmail-pf* code.
+Create domain-specific white/black lists.
+Implement "force" field on domaindefaults.
+Call-out when a password change is made so that a script can update RADIUS
+      or the like.
+Fetchmail functionality, to pull data from another server.

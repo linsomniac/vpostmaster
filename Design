@@ -1,0 +1,59 @@
+Data:
+   Domain:
+      name
+      ExtensionCharacter
+      catchAllAccountName
+      maxUsers
+
+   adminusers
+      name
+      password
+
+   adminuserdomains
+      name
+      domain (name|NULL) NULL == superuser
+
+   User:
+      Username
+      domainId
+      QuotaInBytes
+      password
+      userdir (directory)
+      localEnabled (t|f)
+      forward (NULL|address list)
+      greylistTimeout (seconds, 0|null=disabled)
+      spfAction (continue|reject|quarantine)
+      responderEnabled (t|f)
+      spamassassin1Action (continue|quarantine|drop)
+      spamassassin1Value (NULL|5)
+      spamassassin2Action (continue|quarantine|drop)
+      spamassassin2Value (NULL|10)
+
+   Autoresponder:
+      userId
+      subject
+      body
+
+   envelopeRule:
+      userId
+      action (continue|blacklist|whitelist)
+      remoteIp
+      remoteName
+      sender
+      recipient
+
+   greylist
+      sender
+      recipient
+      remoteIp
+      allowAfter
+      expireAfter
+
+Policy filter would look at incoming messages and check them against
+envelopRule and reject or accept.  It would also check the quota for the
+user and accept or reject incoming messages based on that.  SPF and
+greylist checking would happen here, though a second SPF lookup may happen
+during delivery.
+
+transport file would have "domain pfvirtual:", master.cf would have:
+pfvirtual line to send the message off to the virtual delivery agent.

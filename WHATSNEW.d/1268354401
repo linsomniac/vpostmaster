@@ -1,0 +1,5 @@
+Adjusted SPF Temperror handling.  Will now return DEFER_IF_PERMIT if checked
+      at smtp time, which only happens when user has reject set.
+      Returns DUNNO if checked during delivery (normally when a user has
+      Quarantine set, but may also happen if DNS check fails during SMTP
+      but succeeds during delivery stage. (Reported by Nataraj)

@@ -1,0 +1,157 @@
+VERSION=2.26
+
+vi debian/changelog-commercial
+Add a new entry for this release
+svn commit -m 'Committing debian/changelog-commercial'
+
+./scripts/whatsnew
+   Say yes to tag a new release.
+   Enter $VERSION
+svn commit -m 'New release marker'
+svn update
+svnmerge merge
+svn commit -m 'Merging from public'
+
+svn cp -m "$VERSION release" svn+ssh://vcs/var/svn/vpostmaster/commercial/trunk svn+ssh://vcs/var/svn/vpostmaster/commercial/tags/release-$VERSION
+
+cd /tmp
+rm -rf vpostmaster-$VERSION
+release $VERSION vpostmaster-commercial
+#  ENTER MY GPG PASS PHRASE
+
+Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
+systems aren't happy with.
+
+scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
+ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
+ssh root@dev cp /tmp/vpostmaster-$VERSION.tar.gz \
+      /usr/src/redhat/SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      /usr/src/redhat/RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm \
+      /home/software/
+for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
+   scp root@dev:/usr/src/redhat/"$file" /tmp/
+done
+
+#  RUN TESTING
+
+cd ~/projects/vpostmaster-yum-commercial
+for dir in {fedora,centos}/*/*; do
+   rm -f "$dir"/vpostmaster-*.noarch.rpm
+   cp /tmp/vpostmaster-$VERSION-1.noarch.rpm "$dir"/
+done
+make sign
+#  ENTER MY GPG PASS PHRASE
+
+#  Build Hardy packages:
+
+   VPMBUILDHOST=theobromine
+   REPODIR=ubuntu/hardy
+
+   ssh root@$VPMBUILDHOST "rm -rf vpm-build-$VERSION; mkdir vpm-build-$VERSION"
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum-commercial/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Dapper packages:
+
+   VPMBUILDHOST=10.242.1.201
+   REPODIR=ubuntu/dapper
+
+   ssh root@$VPMBUILDHOST "rm -rf vpm-build-$VERSION; mkdir vpm-build-$VERSION"
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum-commercial/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Lucid packages:
+
+   VPMBUILDHOST=10.242.1.199
+   REPODIR=ubuntu/lucid
+
+   ssh root@$VPMBUILDHOST "rm -rf vpm-build-$VERSION; mkdir vpm-build-$VERSION"
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum-commercial/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Debian Lenny packages:
+
+   VPMBUILDHOST=10.242.1.202
+   REPODIR=debian/lenny
+
+   ssh root@$VPMBUILDHOST "rm -rf vpm-build-$VERSION; mkdir vpm-build-$VERSION"
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum-commercial/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  RELEASE
+cd ~/projects/vpostmaster-yum-commercial
+make install
+echo "$VERSION" | ssh root@dev 'cat >/home/httpd/updates.vpostmaster.com/html/currentversion-commercial.txt'
+
+Send out announcement:
+mutt -s "New vPostMaster commercial release $VERSION" vpostmaster@lists.tummy.com
+
+We are happy to release a new commercial version of vPostMaster.  You can
+upgrade to the new version using your normal system packaging tools, as
+normal.  For example "yum update" or "apt-get update; apt-get
+dist-upgrade".
+
+The particularly interesting changes are:
+
+XXXXXX
+
+The full change log for this version is:
+
+!!~/projects/vpostmaster/commercial/scripts/joinparts ~/projects/vpostmaster/commercial/WHATSNEW.d

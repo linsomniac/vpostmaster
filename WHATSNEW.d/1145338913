@@ -1,0 +1,1 @@
+Changing RPM spec file to use "python-psycopg" to reflect FC5 Extras name.

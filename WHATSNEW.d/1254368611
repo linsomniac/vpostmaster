@@ -1,0 +1,4 @@
+Added an option to restrict users from setting up forwards outside of 
+      their domain. (Suggested by Jason Thies)
+Changed forward mail loop detection routine to use a builtin function 
+      to prepare the regular expression match.

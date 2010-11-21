@@ -1,0 +1,7 @@
+Detect clamdscan availability and use it if clamd is running.  (Suggested by
+      CyberLeo Kitsana)
+Now you can specify the clamscan command to use in the meta table
+      "clamscancommand" row.  The default is "clamscan --stdout -".  It
+      needs to be a command that reads the message from stdin and writes
+      the clamav output to stdout.  In particular, it uses the presence of
+      a line with "FOUND" in it to indicate that a virus was found.

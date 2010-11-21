@@ -1,0 +1,2 @@
+Do not preserve the "From " line when writing the message to the maildir.
+      Reported by Brian Wood, based on problems reported by James Ramsey.

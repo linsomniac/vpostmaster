@@ -1,0 +1,343 @@
+#!/usr/bin/env python
+#
+# (c) 2005, 2006, 2007, 2008 tummy.com, ltd.
+# vPostMaster helper script for creating users.
+#
+#  Helper for the WWW interface for vPostMaster.  This code runs as the
+#  vpostmaster to handle tasks for the web interface.
+
+import string, sys, os, time, syslog, re, pwd, glob
+sys.path.append('/usr/lib/vpostmaster/lib')
+import vpmsupp
+
+vpmsupp.setupExceptHook()
+
+dbConnect = vpmsupp.getConnectStr(
+		      '/usr/lib/vpostmaster/etc/wwwdb.conf')
+
+#  load command
+line = string.rstrip(sys.stdin.readline())
+command, args = string.split(line, '\0', 1)
+#  stdin left open so more data may be passed to individual helpers
+
+#  path to wwwhelper helper scripts
+wwwhelperd = '/usr/lib/vpostmaster/etc/wwwhelper.d'
+vpmbin     = '/usr/lib/vpostmaster/bin/'
+
+#  make sure sbin is in system path
+if os.environ.get('PATH'):
+	os.environ['PATH'] = ('%s:/usr/sbin:/sbin' % os.environ.get('PATH'))
+else:
+	os.environ['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
+
+
+###############################################
+def dumpPostfixDomainTable(connection, cursor):
+	fp = open('/etc/postfix/vpm-domains-dump', 'w')
+	cursor.execute("SELECT name FROM domains WHERE active = 't'")
+	while True:
+		row = cursor.fetchone()
+		if not row: break
+		fp.write('%s ACCEPT\n' % row[0])
+
+	postmapPath = '/usr/sbin/postmap'
+	for checkPath in [
+			postmapPath,
+			'/bin/postmap',
+			'/usr/bin/postmap',
+			'/sbin/postmap',
+			]:
+		if os.path.exists(checkPath):
+			postmapPath = checkPath
+			break
+	ret = os.system('%s hash:/etc/postfix/vpm-domains-dump' % postmapPath)
+	if ret: print 'Error running postmap:', repr(ret)
+
+
+##############
+def getMeta():
+	'''Get information from the meta table, return dictionary.'''
+	connection = vpmsupp.connectToDb(dbConnect)
+	cursor = connection.cursor()
+	cursor.execute('SELECT * FROM meta')
+	info = vpmsupp.dictfetchone(cursor)
+	cursor.close()
+	connection.close()
+	return(info)
+
+
+###########################
+def runHelpers(path, info):
+	if not os.path.isdir(path): return
+
+	#  setup environment for passing to helper scripts
+	for key in info.keys():
+		value = str(info.get(key, ''))
+		if value: os.environ[string.upper(key)] = value
+	for job in glob.glob(os.path.join(path, '*')):
+		ret = os.system(job)
+		if ret: print 'Error running', job
+
+
+########################
+if command == 'newuser':
+	sys.stdin.close()
+
+	#  split up args
+	domainname, username = string.split(args, '\0', 1)
+
+	#  get user information
+	connection = vpmsupp.connectToDb(dbConnect)
+	cursor = connection.cursor()
+	cursor.execute('SELECT * FROM users WHERE name = %s AND domainsname = %s',
+			( username, domainname ))
+	info = vpmsupp.dictfetchone(cursor)
+	cursor.close()
+	connection.close()
+
+	#  no user
+	if not info:
+		print 'ERROR: No such user "%s" in domain "%s"' % ( username, domainname )
+		sys.exit(1)
+
+	#  create new user directory
+	if os.path.exists(info['userdir']):
+		os.spawnvp(os.P_WAIT, 'rm', ( 'rm', '-rf', info['userdir'] ))
+	os.umask(077)
+	resetUid = 0
+	if os.geteuid() == 0:
+		resetUid = 1
+		try:
+			pwent = pwd.getpwnam('vpostmaster')
+			os.seteuid(pwent[2])
+		except KeyError:
+			print 'ERROR: Unable to look up "vpostmaster" user with getpwnam()'
+			sys.exit(1)
+	os.makedirs(os.path.join(info['userdir'], 'Maildir', 'tmp'))
+	os.makedirs(os.path.join(info['userdir'], 'Maildir', 'new'))
+	os.makedirs(os.path.join(info['userdir'], 'Maildir', 'cur'))
+	os.makedirs(os.path.join(info['userdir'], 'Maildir', '.Quarantine', 'tmp'))
+	os.makedirs(os.path.join(info['userdir'], 'Maildir', '.Quarantine', 'new'))
+	os.makedirs(os.path.join(info['userdir'], 'Maildir', '.Quarantine', 'cur'))
+	subscriptionFile = os.path.join(info['userdir'], 'Maildir', '.subscriptions')
+	if not os.path.exists(subscriptionFile):
+		fp = open(subscriptionFile, 'w')
+		fp.write('Quarantine\n')
+		fp.close()
+	if resetUid: os.seteuid(0)
+
+	#  run user-defined scripts
+	runHelpers(os.path.join(wwwhelperd, 'useradd/'), info)
+
+	print 'SUCCESSFUL'
+
+
+########################
+if command == 'rmuser':
+	sys.stdin.close()
+
+	#  split up args
+	domainname, username = string.split(args, '\0', 1)
+
+	#  get user information
+	connection = vpmsupp.connectToDb(dbConnect)
+	cursor = connection.cursor()
+	cursor.execute('SELECT * FROM users WHERE name = %s AND domainsname = %s',
+			( username, domainname ))
+	info = vpmsupp.dictfetchone(cursor)
+	cursor.close()
+	connection.close()
+
+	#  no user
+	if not info:
+		print 'ERROR: No such user "%s" in domain "%s"' % ( username, domainname )
+		sys.exit(1)
+
+	#  remove user directory
+	if os.path.exists(info['userdir']):
+		os.spawnvp(os.P_WAIT, 'rm', ( 'rm', '-rf', info['userdir'] ))
+
+	#  run user-defined scripts
+	runHelpers(os.path.join(wwwhelperd, 'userdel/'), info)
+
+	print 'SUCCESSFUL'
+
+
+##############################
+if command == 'mydestination':
+	sys.stdin.close()
+
+	fp = os.popen('postconf mydomain', 'r')
+	line = fp.readline()
+	fp.close()
+	mydomain = string.strip(string.split(line, '=', 1)[1])
+
+	fp = os.popen('postconf myhostname', 'r')
+	line = fp.readline()
+	fp.close()
+	myhostname = string.strip(string.split(line, '=', 1)[1])
+
+	fp = os.popen('postconf mydestination', 'r')
+	line = fp.readline()
+	fp.close()
+
+	line = string.strip(line)
+	data = string.split(line, '=', 1)
+	if len(data) == 2 and string.strip(data[0]) == 'mydestination':
+		#  expand common $ variable names
+		mydestination = string.join(map(string.strip,
+			string.split(data[1], ',')), ',')
+		mydestination = string.replace(mydestination, '$mydomain', mydomain)
+		mydestination = string.replace(mydestination, '$myhostname', myhostname)
+		mydestination = string.replace(mydestination, '$mydomain', mydomain)
+
+		print mydestination
+
+	print 'SUCCESSFUL'
+
+
+#########################
+if command == 'rmdomain':
+	sys.stdin.close()
+
+	domainname = args
+
+	connection = vpmsupp.connectToDb(dbConnect)
+	cursor = connection.cursor()
+
+	#  remove the domain directory
+	cursor.execute('SELECT domaindir FROM domains WHERE name = %s',
+			( domainname, ))
+	row = cursor.fetchone()
+	if row:
+		oldDomainDirName = row[0]
+		newDomainDirName = oldDomainDirName + ('.deleted-%.6f' % time.time())
+		if (os.path.exists(oldDomainDirName) and
+				oldDomainDirName[:23] == '/var/spool/vpostmaster/'):
+			os.rename(oldDomainDirName, newDomainDirName)
+			os.system('rm -rf "%s" &' % newDomainDirName)
+	else:
+		connection.rollback()
+
+	dumpPostfixDomainTable(connection, cursor)
+
+	cursor.close()
+	connection.close()
+
+	print 'SUCCESSFUL'
+
+##########################
+if command == 'newdomain':
+	sys.stdin.close()
+
+	connection = vpmsupp.connectToDb(dbConnect)
+	cursor = connection.cursor()
+
+	dumpPostfixDomainTable(connection, cursor)
+
+	cursor.close()
+	connection.close()
+
+	print 'SUCCESSFUL'
+
+
+########################
+if command == 'bulkadd':
+	import csv
+
+	#  split up args
+	alloweddomains = string.split(args, '\0')
+	reader = csv.reader(sys.stdin)
+	#  first row must contain the field names
+	index = {}
+
+	#  need to validate data?
+	try:
+		position = 0
+		for key in reader.next():
+			index[string.upper(str(key))] = position
+			position += 1
+	except StopIteration:
+		print "Empty CSV. No modifications made."
+		sys.exit(0)
+
+	if not index.has_key('ACTION'):
+		print "Could not find action label"
+		sys.exit(0)
+
+	#  for matching various pre-defined headers
+	newuser = re.compile(r'^(newuser|create)$',           re.I)
+	rmuser  = re.compile(r'^(rmuser|delete)$',            re.I)
+	user    = re.compile(r'^(vpm)?user(name)?$',          re.I)
+	domain  = re.compile(r'^(vpm)?domain(name)?$',        re.I)
+	passwd  = re.compile(r'^(vpm)?passw(or)?d$',          re.I)
+	crypted = re.compile(r'^(vpm)?crypted-?passw(or)?d$', re.I)
+	quota   = re.compile(r'^(vpm)?quota$',                re.I)
+	address = re.compile(r'^(e-?mail)?address$',          re.I)
+	extras  = re.compile(r'^(vpm)?extra_(\w{1,32})$',     re.I)
+
+	envvars = [
+			'VPMACTION',
+			'VPMUSER',
+			'VPMDOMAIN',
+			'VPMPASSWORD',
+			'VPMCRYPTEDPASSWORD',
+			'VPMQUOTA'
+	]
+
+	for row in reader:
+		#  clear environment variables
+		for env in envvars: os.unsetenv(env)
+
+		if newuser.match(row[index['ACTION']]):
+			os.environ['VPMACTION'] = 'create'
+		elif rmuser.match(row[index['ACTION']]):
+			os.environ['VPMACTION'] = 'delete'
+		else:
+			print "newuser or rmuser not specified.  Could not run", row
+			continue
+
+		for key in index.keys():
+			if key == 'ACTION': continue
+			elif len(row) <= index[key]: continue
+			elif user.match(key) and row[index[key]]:
+				os.environ['VPMUSER'] = str(row[index[key]])
+			elif domain.match(key) and row[index[key]]:
+				os.environ['VPMDOMAIN'] = str(row[index[key]])
+			elif passwd.match(key) and str(row[index[key]]) and not \
+					os.environ['VPMACTION'] == 'delete':
+				os.environ['VPMPASSWORD'] = str(row[index[key]])
+			elif crypted.match(key) and str(row[index[key]]) and not \
+					os.environ['VPMACTION'] == 'delete':
+				os.environ['VPMCRYPTEDPASSWORD'] = str(row[index[key]])
+			elif quota.match(key) and row[index[key]]:
+				os.environ['VPMQUOTA'] = str(row[index[key]])
+			elif address.match(key) and row[index[key]] and \
+					'@' in row[index[key]]:
+				os.environ['VPMUSER'], os.environ['VPMDOMAIN'] = \
+						str(row[index[key]]).split('@', 1)
+			else:
+				#  check for extras
+				match = extras.match(key)
+				if match and str(row[index[key]]):
+					envkeyname = 'VPMEXTRA_' + string.upper(match.group(2))
+					os.environ[envkeyname] = str(row[index[key]])
+					#  add to envvars so that it gets unset above
+					if not envkeyname in envvars: envvars.append(envkeyname)
+
+		#  verify that domain is in authorized list
+		if alloweddomains[0] != '*' and not os.environ['VPMDOMAIN'] in \
+				alloweddomains:
+			print 'You are not authorized to add a user to "%s"' % \
+					os.environ['VPMDOMAIN']
+
+		#  Flush file handles
+		sys.stdout.flush()
+		sys.stderr.flush()
+
+		#  Assuming the right environment variables, run vpmuser
+		#  P_WAIT set for debugging, for performance, set to P_NOWAIT
+		os.spawnl(os.P_WAIT, os.path.join(vpmbin, 'vpmuser'),  'vpmuser',
+				'--environment')
+
+	sys.stdin.close()

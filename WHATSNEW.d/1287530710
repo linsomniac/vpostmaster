@@ -1,0 +1,3 @@
+Making vpm-pgmaintain and vpm-backup not output errors to stdout if
+      PostgreSQL isn't running or files are missing (useful for standby
+      nodes of HA clusters).

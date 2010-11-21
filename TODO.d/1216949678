@@ -1,0 +1,6 @@
+Correct the smtp_recipient_restrictions so that unknown recipients which
+      are sent from SASL authorized users or local IPs are rejected.  This
+      involves adding "reject_unlisted_recipient" to the beginning of the
+      smtp_recipient_restrictions, and add a virtual_mailbox_maps line that
+      points at "pgsql:/etc/postfix/vpm-users", and set up the vpm-users
+      file to correctly look up the user.

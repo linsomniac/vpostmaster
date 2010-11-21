@@ -1,0 +1,37 @@
+Source: vpostmaster
+Section: non-free/mail
+Priority: optional
+Maintainer: Scott Kleihege <scott-dpkg@tummy.com>
+Build-Depends: debhelper (>= 4.0.0)
+Standards-Version: 3.6.1
+
+Package: vpostmaster
+Architecture: all
+Depends: bash (>= 2.04), bzip2, clamav, dovecot-imapd (>= 0.99.13), dovecot-pop3d (>= 0.99.13), libsasl2-modules, libnet-dns-perl, postfix-tls | postfix (>= 2.2), postfix-pgsql, python, python-dns, python-psycopg | python-psycopg2, python-spf, sasl2-bin, spamassassin, spamc, squirrelmail, php4-pgsql | php5-pgsql , sudo, ${shlibs:Depends}, ${misc:Depends}
+Recommends: lokkit
+Conflicts: exim4, exim4-base, exim4-config, exim4-daemon-light, exim4-daemon-heavy, bozohttpd
+Description: A full-featured, easy to install & manage, virtual mail server
+ vPostMaster is a full-featured, easy to install and maintain system for
+ handling virtual mail domains with Postfix.  It provides an extremely
+ comprehensive set of features including Webmail, POP, IMAP, SMTP, SMTP
+ AUTH, SSL versions of the above, virtual e-mail domains, spam and virus
+ filtering, user-controlled mail rules, SPF, Greylisting, SpamAssassin,
+ ClamAV, White/Black lists, and more.
+ .
+ Users are able to control their own spam, filter, and mailbox settings,
+ on an individual basis.  In other words, you don't have to disable
+ greylisting for your entire domain just because a single user wants it
+ disabled.
+ .
+ Domains and users are set up in such a way that system user accounts are
+ not required for mail access, preventing mail users from gaining access to
+ the system.
+ .
+ A web-based control panel is installed which allows superusers to create
+ new domains and users, domain admins to manage users, and users to manage
+ their own spam and mail system settings.  In this way, a vPostMaster
+ administrator may delegate management of users and domains to third
+ parties.
+ .
+ More information can be found at:
+    http://www.tummy.com/Products/vpostmaster/

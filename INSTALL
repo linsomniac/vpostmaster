@@ -1,0 +1,164 @@
+vPostMaster Installation Instructions
+(c) 2005, 2006 tummy.com, ltd.
+http://www.tummy.com/
+http://www.vpostmaster.com/
+info@tummy.com
+
+SUPPORTED DISTRIBUTIONS
+
+   The following distributions are supported directly by vPostMaster.
+   Others may work, but they may require manual installation (see below) as
+   opposed to packaged installation via the "install-vpostmaster" script.
+
+      Fedora Core 4 (Preferred)
+      Fedora Core 3 (Preferred)
+      Fedora Core 2
+      CentOS 4.* (Preferred)
+      Red Hat Advance/Enterprise (RHAS/RHES) Linux 4.* (Preferred)
+      Debian Stable
+      Ubuntu 6.06 Dapper Drake
+      Ubuntu 5.10 Breezy Badger
+      Ubuntu 5.04 Hoary Hedgehog
+
+INTRODUCTION
+
+   vPostMaster is a full featured email server with an easy to use web
+   interface for administering domains, email users and filtering rules.
+
+   There are two version of vPostMaster: Community and Pro.  The Community
+   version is free for all use, under the terms of the GNU Public License.
+   The Pro version adds functionality such as mailing list support and
+   autoresponders/vacation mail, for a reasonable price.
+
+   Normally, you would use the "install-vpostmaster" script to install
+   vPostMaster.  This script automatically goes through and installs all
+   required packages for vPostMaster, using system package formats (RPM,
+   dpkg, as appropriate).  Details of what is being done can be obtained by
+   looking at the "install-vpostmaster" script source.
+
+   If your OS is not one of the supported distributions listed above, you
+   can do a generic manual installation using detailed instructions below.
+
+   The Generic Installation instructions assume you have or can:
+      a recent Linux system installed with SELinux disabled
+      login as root
+      install packages using rpm or apt-get
+      edit a text file
+      run a script as root
+      use a web browser
+      start and stop services
+      load and configure a Postgres database
+
+PACKAGES
+
+   vPostMaster is the consolidation of many different open source and
+   freely available tools and programs, into a well-integrated environment.
+   It relies on many different programs, however modern Linux packaging
+   techniques can make the end result very easy to install.  Combined with
+   automated setup scripts, vPostMaster can be incredibly easy to install.
+
+   Instructions are included below for installation over the network using
+   package repositories, as well as manual installation instructions for
+   systems which we have not created packages for.  Check the vPostMaster
+   web site (http://www.tummy.com/Products/vpostmaster/) for the latest
+   information on distributions we provide prepackaged releases for.
+
+   We will try to support the more common systems with pre-built packages.
+   However, there are only so many test systems we can have available.
+   Therefore, paying customers have an advantage here.  If you are ready to
+   purchase and would like support for your favorite distribution, please
+   contact us via the above web site for more information.
+
+BEFORE YOU BEGIN
+
+   It is highly recommended that you not install vPostMaster, or any
+   mail-related software, on a production system.  Conflicts between
+   existing and new mail software may result in lost or corrupted data or
+   system settings and more.  Please also ensure that you have a backup of
+   any important data on the system before you being.
+
+PACKAGED INSTALL: Automatic Installation with install-vpostmaster
+
+   These instructions assume that you are using a supported distribution,
+   listed above, and that you have recent backups of any important data on
+   your system.  These instructions and the install script are tested
+   against a stock installation, and may fail if customizations have been
+   done.
+
+   The automatic installation uses system package formats, so all software
+   is installed via RPM or dpkg formats.  See the source of
+   "install-vpostmaster" for more details on what the script is doing.
+
+   Installation:
+
+      Download the "install-vpostmaster" script.  It is located at
+      ftp://ftp.tummy.com/pub/tummy/vpostmaster/install-vpostmaster
+      For example, the following commands will download the script using
+      wget:
+
+         cd /tmp
+         wget ftp://ftp.tummy.com/pub/tummy/vpostmaster/install-vpostmaster
+         chmod 755 install-vpostmaster
+
+      The last command makes the script executable.
+
+   Run Install Script:
+
+      The installation of all packages and post-install setup has been
+      incorporated into the "install-vpostmaster" script.  It will display
+      a message and ask for confirmation, and give you an opportunity to
+      provide the Pro version username/password.  It will then complete the
+      installation for you.
+
+      Run:
+
+         ./install-vpostmaster
+
+   Use Browser to Configure:
+
+      The system is now installed and running.  The password for the
+      "superuser" account is written to the file:
+
+         /usr/lib/vpostmaster/etc/superuser
+
+      You can then use a web browser to access the management interface at:
+
+         http://HOSTNAME/vpostmaster/
+
+      Additionally, Web Mail is at:
+
+         http://HOSTNAME/webmail/
+
+      After you have logged in with "superuser" and the password in the
+      file above, see the "Getting Started" link on the left for more
+      information.
+
+GENERIC INSTALL (Other/Generic/Manual Install Instructions)
+
+   Manually installing on a system for which the Debian or Fedora packages
+   will not work is not documented in human-readable form.  For users who
+   wish to install on other platforms, read and understand either the spec
+   file and scripts/setup-fc3, or the debian control files and
+   scripts/setup-debian.  These files are what control the installation in
+   the packaged versions of the software, and are the only definitive
+   collection of the required steps for installing vPostMaster.
+
+SUPPORT
+
+   If you run into trouble with vPostMaster, support is available from
+   tummy.com's experienced system administrators.
+
+   Commercial Licenses include support.
+
+   Paid support is available for free, non-commercial installations.
+
+FINAL THOUGHTS
+
+   There are support forums available for vPostMaster users.
+
+   If you have questions with either the non-commercial or commercial
+   version please contact us through our secure web form at
+
+      https://secure.tummy.com/Company/contactus.html/
+
+   or by email to info@tummy.com

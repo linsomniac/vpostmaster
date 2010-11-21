@@ -1,0 +1,7 @@
+Added lines to vpm-backup to add sasl configuration to backup files.
+Modified sasl configuration in setup-* scripts to only report PLAIN
+	and LOGIN for SMTP AUTH.
+Modified setup-fc3 script to always enable pop3 pop3s imap and imaps
+	services for dovecot by default.
+Added mailman as a dependency in the debian versions.
+Changed debian phpX-pgsql dependency to allow php4 or php5 to fill it.

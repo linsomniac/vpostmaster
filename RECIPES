@@ -1,0 +1,82 @@
+Recipes for vPostMaster
+
+Aliases for vPostMaster domains:
+
+   vPostMaster does not internally support "aliases".  By aliases, I'm
+   talking about a simple mapping of one e-mail address to one or more
+   others.  vPostMaster does support having one account forward mail to
+   others, optionally while storing a copy in the local account, but this
+   does require that a real account be set up, complete with password, etc.
+
+   This is the preferred way of doing aliases in vPostMaster, because then
+   all accounts are treated the same, and users don't get confused with two
+   separate locations for where an e-mail address may be handled.
+
+   However, you can configure Postfix to do aliases if you absolutely must
+   have them.
+
+   In the "main.cf" file, you will need to add the line:
+
+      virtual_alias_maps = regexp:/etc/postfix/virtual-regexp $alias_maps
+
+   And then in the section under "smtpd_recipient_restrictions" you need to
+   add the following line before the "check_policy_service
+   unix:private/vpm-pfpolicy" line:
+
+      check_recipient_maps regexp:/etc/postfix/virtual-regexp-allow
+
+   This example uses regexp maps, but this could just as easily be a hash.
+
+   You will need to create these two files mentioned above.  In the
+   "virtual-regexp" file, you need to list the aliase account and the
+   address it's translated to.  For example, if you want to forward "foo"
+   to "bar" and "baz" in the "example.com" domain:
+
+      /^foo@example.com$/   bar@example.com, baz@example.com
+
+   In the "virtual-regexp-allow" file, you need to list the same left-hand
+   with "OK" for the right hand, so that the SMTP server knows to allow
+   this address:
+
+      /^foo@example.com$/   OK
+
+   Restart Postfix and now when you mail "foo@example.com" it should
+   deliver to "bar@example.com" and "baz@example.com".
+
+Backing up vPostMaster:
+
+   To backup vPostMaster, you have to get the following data:
+
+      /etc/postfix
+         The location where the Postfix configuration information is
+         stored.  This rarely if ever changes.
+
+      /etc/dovecot.conf and /etc/dovecot-pgsql.conf
+         Dovecot configuration and settings.  This rarely if ever changes.
+
+      /var/spool/vpostmaster
+         The directory where e-mail is stored.  This can be rather large
+         and changes frequently.
+
+      The PostgreSQL database tables.
+         This is where all the mail system meta-data is stored.  I'd
+         recommend dumping these into the file-system somewhere with
+         "su postgres -c pg_dumpall >/path/to/backup/file".
+
+         This data changes frequently.
+
+      /usr/lib/vpostmaster/etc
+         This includes some database access files which are required for
+         some parts of the system to access the database.  This includes
+         the access credentials for incoming mail processing, and the web
+         interface.
+
+      The /etc/passwd and /etc/group entry for the "vpostmaster" account.
+         The uid/gid's of these accounts either need to stay the same after
+         a restore, or any file ownership associated with them need to be
+         changed.  In particular, /var/spool/vpostmaster must be owned by
+         the vpostmaster user and writable by it, and the
+         /usr/lib/vpostmaster/etc/*.conf files have to be readable by
+         vpostmaster.  The "wwwdb.conf" file also has to be readable by
+         Apache, which is typically done during the install by changing
+         it's group to the Apache group, and changing it's mode to 0660.

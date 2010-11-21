@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# (c) 2005 tummy.com, ltd.
+#
+#  Restore backup config files from before vpostmaster was installed.
+#  These should have the .vpostmaster extension added.
+
+PATH=$PATH:/usr/sbin:/sbin
+
+#  restore backup files
+function restore {
+[ -f "$1".vpostmaster ] && mv "$1".vpostmaster "$1"
+}
+
+# set sasl back
+SASLRUN=/var/run/saslauthd
+POSTRUN=/var/spool/postfix/var/run/salauthd
+if [ -d "$SASLRUN".vpostmaster ]
+then
+	dpkg-statoverride --remove "$SASLRUN"
+	dpkg-statoverride --add root sasl 710 "$SASLRUN"
+	rm -r "$SASLRUN"
+	mv "$SASLRUN".vpostmaster "$SASLRUN"
+	[ -d "$POSTRUN" ] && rm -r "$POSTRUN"
+fi
+
+restore /etc/default/saslauthd
+/etc/init.d/saslauthd restart
+
+# set spamassassin back
+restore /etc/default/spamassassin
+/etc/init.d/spamassassin restart
+
+# set dovecot back
+restore /etc/dovecot/dovecot.conf
+restore /etc/dovecot-pgsql.conf
+restore /etc/dovecot/dovecot-vpostmaster.conf
+/etc/init.d/dovecot restart
+
+# set postfix back
+[ -f /etc/postfix/vpm-domains ] && rm /etc/postfix/vpm-domains
+restore /etc/postfix/main.cf
+restore /etc/postfix/master.cf
+/etc/init.d/postfix restart
+
+# set sudoers back
+restore /etc/sudoers
+
+# set squirrelmail back
+restore /etc/squirrelmail/apache.conf
+
+# set apache back
+for HTTPCONF in /etc/apache/httpd.conf /etc/apache2/apache2.conf
+do
+	restore $HTTPCONF
+done
+restore /etc/default/apache2
+[ -x /etc/init.d/apache2 ] && /etc/init.d/apache2 restart
+[ -x /etc/init.d/apache2 ] && /etc/init.d/apache2 restart
+
+# remove postgres vpostmaster database
+if su postgres -c "cd /tmp; psql -d vpostmaster -c 'SELECT 1'" >/dev/null 2>&1
+then
+	su postgres -c "cd /tmp; dropdb vpostmaster"
+fi
+
+# reset postgres
+for PGINIT in /etc/init.d/postgresql /etc/init.d/postgresql-7.4 \
+		/etc/init.d/postgresql-8.0
+do
+	[ -x $PGINIT ] && $PGINIT stop
+done
+
+for PGBASE in /etc/postgresql /etc/postgresql/7.4/main \
+		/etc/init.d/postgresql-8.0/main
+do
+	[ -d "$PGBASE" ] || continue
+	restore "$PGBASE"/postgresql.conf
+	restore "$PGBASE"/pg_hba.conf
+	[ -f "$PGBASE"/pg_hba.conf ] && chown root:postgres "$PGBASE"/pg_hba.conf
+done
+
+for PGINIT in /etc/init.d/postgresql /etc/init.d/postgresql-7.4 \
+		/etc/init.d/postgresql-8.0
+do
+	[ -x $PGINIT ] && $PGINIT start
+done
+
+# remove vpostmaster config files
+[ -f /usr/lib/vpostmaster/etc/wwwdb.conf ] && \
+		rm /usr/lib/vpostmaster/etc/wwwdb.conf
+[ -f /usr/lib/vpostmaster/etc/vpostmaster-db.conf ] && \
+		rm /usr/lib/vpostmaster/etc/vpostmaster-db.conf
+[ -f /usr/lib/vpostmaster/etc/superuser ] && \
+		rm /usr/lib/vpostmaster/etc/superuser

@@ -1,0 +1,4 @@
+On SPF rejection, produce a URL like (suggested by Charles Clarke):
+
+   http://www.openspf.org/Why?show-form=1&identity=federatedmedia.com&ip-address=64.141.189.12&.submit=Submit
+
