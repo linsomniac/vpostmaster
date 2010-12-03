@@ -5,7 +5,7 @@
 FILENAME=WHATSNEW.d/`date +%s`
 
 touch "$FILENAME"
-svn add "$FILENAME"
+git add "$FILENAME"
 
 echo -n "Is this to be marker for a version release? [y/N] "
 read line
@@ -22,8 +22,3 @@ then
    MESSAGE="WHATSNEW entry for version $VERSION."
 fi
 $EDITOR "$FILENAME"
-
-echo -n 'Commit file? [Y/n] '
-read line
-[ "$line" = n ] && exit 0
-svn commit -m "" "$FILENAME"

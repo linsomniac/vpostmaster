@@ -804,6 +804,11 @@ class checkClass:  #{{{1
 			syslog.syslog('ERROR: Unable to import SPF module.')
 			return(( 'DUNNO', '' ))
 
+		if self.debug >= 3:
+			syslog.syslog(syslog.LOG_DEBUG, 'SPF info: %s,%s,%s'
+					% ( self.data['client_address'], self.data['sender_domain'],
+						'unknown' ))
+
 		#  SPF version 2 check
 		if hasattr(spf, 'check2'):
 			try:

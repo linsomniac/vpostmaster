@@ -257,6 +257,7 @@ def processMessage(cursor, connection, debug = 0):  #{{{1
 	#  discard the "From " line.
 	fromLine = sys.stdin.readline()
 	if fromLine[:5] != 'From ': write(fromLine)
+	else: fromLine = ''
 
 	#  add headers
 	write('X-Original-To: %s\n' % recipient)
@@ -264,7 +265,7 @@ def processMessage(cursor, connection, debug = 0):  #{{{1
 
 	#  copy message from stdin
 	data = read(10240)
-	firstBlock = data
+	firstBlock = fromLine + data
 	while 1:
 		if not data: break
 		write(data)
