@@ -2,20 +2,22 @@
 eval `scripts/latestversion`
 
 scripts/newchangelogentry
-git commit -a -m 'Committing debian/changelog'
 
 ./scripts/whatsnew
    Say yes to tag a new release.
    Enter $VERSION
-cd ../commercial
-svn update
-svnmerge merge
-svn commit -m 'Merging from public'
-***svn rm <THE WHATSNEW.D FILE MERGED ABOVE>
-svn commit -m 'Removing the public release tag file.'
-cd ../public
+git commit -a -m 'Committing debian/changelog and WHATSNEW'
+git push
+#cd ../commercial
+#svn update
+#svnmerge merge
+#svn commit -m 'Merging from public'
+#***svn rm <THE WHATSNEW.D FILE MERGED ABOVE>
+#svn commit -m 'Removing the public release tag file.'
+#cd ../public
 
-svn cp -m "$VERSION release" svn+ssh://vcs/var/svn/vpostmaster/public/trunk svn+ssh://vcs/var/svn/vpostmaster/public/tags/release-$VERSION
+git tag -s -m "Release $VERSION" release-"$VERSION"
+git push --tags
 
 cd /tmp
 rm -rf vpostmaster-${VERSION}*
