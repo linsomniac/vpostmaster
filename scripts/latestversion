@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+#  Get the latest version
+
+VERSION=`grep '^Version' WHATSNEW.d/* | tail -1 | awk '{ print $2 }'`
+echo "VERSION=$VERSION" >/dev/tty
+echo "VERSION=$VERSION"

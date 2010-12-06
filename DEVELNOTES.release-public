@@ -1,4 +1,5 @@
-VERSION=1.64
+#  SET THE VERSION
+eval `scripts/latestversion`
 
 vi debian/changelog
 Add a new entry for this release
