@@ -1,9 +1,8 @@
 #  SET THE VERSION
 eval `scripts/latestversion`
 
-vi debian/changelog
-Add a new entry for this release
-svn commit -m 'Committing debian/changelog'
+scripts/newchangelogentry
+git commit -a -m 'Committing debian/changelog'
 
 ./scripts/whatsnew
    Say yes to tag a new release.
