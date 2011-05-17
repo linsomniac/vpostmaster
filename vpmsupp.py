@@ -158,7 +158,7 @@ def extensionCombinations(s, e): #{{{1
 
 #########################################################
 def resolveExtensionUser(recipientLocal, recipientDomain, #{{{1
-		extensionChar, cursor):
+		extensionChar, cursor, debug = 0):
 	for local, ext in extensionCombinations(recipientLocal, extensionChar):
 		if ext == '': ext = None
 
@@ -198,7 +198,7 @@ def resolveUser(recipientLocal, recipientDomain, loopDetect, #{{{1
 
 	recipientLocal, recipientExtension, userData = (
 			resolveExtensionUser(recipientLocal, recipientDomain, extensionChar,
-					cursor))
+					cursor, debug))
 
 	#  try resolution, if exception just use the current data
 	try:

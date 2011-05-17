@@ -1,0 +1,2 @@
+Fix a bug in resolveExtensionUser, debug was not being passed in.
+      (Patch by Bussi Andrea)
