@@ -40,9 +40,10 @@ done
 
 #  PUSH INTO YUM
 
-cd projects/vpostmaster-yum
-for file in `find [fc]* -type f -name vpostmaster\*.rpm`; do rm -f "$file";
-      cp /tmp/vpostmaster-$VERSION*.noarch.rpm `dirname "$file"`; done
+cd projects/vpostmaster-yum &&
+      find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
+      for dir in [fc]*/*/*/repodata; do
+            cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
 make sign
 
 #  Build Hardy packages:
