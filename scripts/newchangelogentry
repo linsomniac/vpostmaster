@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+#  Add a new Debian changelog entry.
+
+if [ -z "$VERSION" ]; then
+   echo "ERROR: VERSION environment variable is not set!"
+   exit 1
+fi
+
+if grep -q -w '\('"$VERSION"'\)' debian/changelog; then
+   echo "ERROR: Version $VERSION already in debian/changelog!"
+   exit 1
+fi
+
+
+( cat <<@EOF
+vpostmaster ($VERSION) stable; urgency=low
+
+  * New upstream version.  See WHATSNEW.
+
+ -- Sean Reifschneider <jafo@tummy.com>  `date '+%a, %d %b %Y %H:%M:%S %z'`
+
+@EOF
+cat debian/changelog
+) >debian/changelog.new
+cat debian/changelog.new >debian/changelog
+rm -f debian/changelog.new
+git diff debian/changelog
