@@ -12,17 +12,19 @@ if grep -q -w '\('"$VERSION"'\)' debian/changelog; then
    exit 1
 fi
 
-
-( cat <<@EOF
+cat <<@EOF >debian/changelog.new
 vpostmaster ($VERSION) stable; urgency=low
 
   * New upstream version.  See WHATSNEW.
 
- -- Sean Reifschneider <jafo@tummy.com>  `date '+%a, %d %b %Y %H:%M:%S %z'`
+ -- Sean Reifschneider <jafo@tummy.com>  `date "+%a, %d %b %Y %H:%M:%S %z"`
 
 @EOF
-cat debian/changelog
-) >debian/changelog.new
+cat debian/changelog >>debian/changelog.new
 cat debian/changelog.new >debian/changelog
 rm -f debian/changelog.new
-git diff debian/changelog
+
+echo "======================================"
+echo "GIT DIFF"
+echo "======================================"
+git diff
