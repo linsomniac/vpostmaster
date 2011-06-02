@@ -8,13 +8,13 @@ scripts/newchangelogentry
    Enter $VERSION
 git commit -a -m 'Committing debian/changelog and WHATSNEW'
 git push
-#cd ../commercial
-#svn update
-#svnmerge merge
-#svn commit -m 'Merging from public'
-#***svn rm <THE WHATSNEW.D FILE MERGED ABOVE>
-#svn commit -m 'Removing the public release tag file.'
-#cd ../public
+cd ../commercial
+git pull
+git fetch upstream
+git merge upstream/master
+git rm <THE WHATSNEW.D FILE MERGED ABOVE>
+git commit -a -m 'Removing the public release tag file.'
+cd ../public
 
 git tag -s -m "Release $VERSION" release-"$VERSION"
 git push --tags
