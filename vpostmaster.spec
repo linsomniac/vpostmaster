@@ -1,3 +1,5 @@
+%{?!CENT6: %define CENT6 0}
+
 %define name    vpostmaster
 %define version 1.00
 %define release 1
@@ -23,9 +25,15 @@ Requires:      dovecot
 %endif
 Requires:      php-pgsql
 Requires:      python
+%if %{CENT6}
+Requires:      python-pydns
+Requires:      python-pyspf
+Requires:      python-psycopg2
+%else
 Requires:      pydns
 Requires:      pyspf
 Requires:      python-psycopg
+%endif
 Requires:      squirrelmail
 Requires:      postgresql
 Requires:      sudo
