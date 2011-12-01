@@ -10,15 +10,11 @@ SUPPORTED DISTRIBUTIONS
    Others may work, but they may require manual installation (see below) as
    opposed to packaged installation via the "install-vpostmaster" script.
 
-      Fedora Core 4 (Preferred)
-      Fedora Core 3 (Preferred)
-      Fedora Core 2
-      CentOS 4.* (Preferred)
-      Red Hat Advance/Enterprise (RHAS/RHES) Linux 4.* (Preferred)
+      RHEL / CentOS 5.*
+      RHEL / CentOS 6.* (Preferred)
       Debian Stable
-      Ubuntu 6.06 Dapper Drake
-      Ubuntu 5.10 Breezy Badger
-      Ubuntu 5.04 Hoary Hedgehog
+      Ubuntu 8.04
+      Ubuntu 10.04 (Preferred)
 
 INTRODUCTION
 

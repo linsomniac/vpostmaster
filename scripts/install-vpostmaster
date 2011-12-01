@@ -170,8 +170,14 @@ then
          && OSTYPE=CentOS-4 && METHOD=yum
    grep -q 'CentOS release 5' /etc/redhat-release \
          && OSTYPE=CentOS-5 && METHOD=yum
+   grep -q 'CentOS Linux release 6' /etc/redhat-release \
+         && OSTYPE=CentOS-6 && METHOD=yum
    egrep -q 'Red Hat Enterprise [[:alpha:] ]*4 ' /etc/redhat-release \
          && OSTYPE=RHEL-4 && METHOD=up2date
+   egrep -q 'Red Hat Enterprise [[:alpha:] ]*5 ' /etc/redhat-release \
+         && OSTYPE=RHEL-5 && METHOD=up2date
+   egrep -q 'Red Hat Enterprise [[:alpha:] ]*6 ' /etc/redhat-release \
+         && OSTYPE=RHEL-6 && METHOD=up2date
 fi
 if [ -f /etc/debian_version ]
 then
@@ -234,12 +240,12 @@ case "$METHOD" in
          echo "gpgcheck=1" >>vpostmaster.repo
 
          echo "*** Setting up EPEL repository..."
-         if [ "${OSTYPE##*-}" -eq 4 ]
-         then
+         if [ "${OSTYPE##*-}" -eq 4 ]; then
             rpm -Uvh http://download.fedora.redhat.com/pub/epel/4/`uname -i`/epel-release-4-9.noarch.rpm
-         elif [ "${OSTYPE##*-}" -eq 5 ]
-         then
+         elif [ "${OSTYPE##*-}" -eq 5 ]; then
             rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/`uname -i`/epel-release-5-3.noarch.rpm
+         elif [ "${OSTYPE##*-}" -eq 6 ]; then
+            rpm -Uvh http://download.fedora.redhat.com/pub/epel/6/`uname -i`/epel-release-6-5.noarch.rpm
          fi
       fi
 
