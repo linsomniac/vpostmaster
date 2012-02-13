@@ -62,11 +62,19 @@
 
    #  they are positive
    if ($positive) {
-      $ret = vpm_deleteDomain($name);
-      if ($ret != "") {
+      $errors = vpm_deleteDomain($name);
+      if ($errors != "") {
          vpm_header("vPostMaster Domain Delete Failed");
          echo "<h1>Delete ${name} Failed</h1>";
-         echo "<font color=\"#ff0000\">Error</font> deleting domain: $ret";
+         echo "<font color=\"#ff0000\">Error</font> deleting domain:";
+
+         if (count($errors) > 0) {
+            echo "<ul>";
+            foreach ($errors as $error) {
+               echo "<li />$error";
+            }
+            echo "</ul>";
+         }
       }
       else {
          $_SESSION["vpmsession_selecteddomain"] = "";
