@@ -18,7 +18,7 @@ BKUP_NAME=vpostmaster-configfiles.tar.bz2
 [ -d "$SAVE_DIR" ] || install -d --ovpostmaster -m700 "$SAVE_DIR"
 umask 077
 
-( cd /tmp/; su postgres -c 'psql -d vpostmaster2 \
+( cd /tmp/; su postgres -c 'psql -d vpostmaster \
 		-c "select 1"' >/dev/null 2>&1 ) &&
 		( su postgres -c "cd /tmp; pg_dump vpostmaster" | \
 		bzip2 -1 > "$SAVE_DIR/$DUMP_NAME".tmp )
