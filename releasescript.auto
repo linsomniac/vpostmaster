@@ -20,6 +20,7 @@ then
 	. /etc/lsb-release
 	rev=${rev%%ubuntu*}
 	#  modify changelog to indicate Ubuntu
+	#  This is provided by the package "devscripts"
 	dch -D $DISTRIB_CODENAME -v "$rev-ubuntu1" 'Debian synchronization.'
 fi
 
