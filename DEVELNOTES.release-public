@@ -25,13 +25,8 @@ rm -rf vpostmaster-${VERSION}*
 release "$VERSION" vpostmaster
 #  ENTER MY GPG PASS PHRASE
 
-Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
-systems aren't happy with.
-
-#  Clean out repo files for old version
-cd projects/vpostmaster-yum &&
-      find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
-      for dir in [fc]*/*/*/repodata; do
+# Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
+# systems aren't happy with.
 
 scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
 ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
@@ -43,14 +38,17 @@ for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
    scp root@dev:/usr/src/redhat/"$file" /tmp/
 done
+
+#  Clean out repo files for old version
 cd ~/projects/vpostmaster-yum &&
+   find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
    for dir in [fc]*/*/*/repodata; do
       cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
 
 #  Build on CentOS 6-32
 VPMBUILDHOST=vpm-cent6-32
-scp vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
-ssh root@$VPMBUILDHOST rpmbuild -ta --define "CENT6 1" /tmp/vpostmaster-"$VERSION".tar.gz
+scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
+ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
 for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
    scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum/centos/6/i686/
@@ -58,8 +56,8 @@ done
 
 #  Build on CentOS 6-64
 VPMBUILDHOST=vpm-cent6-64
-scp vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
-ssh root@$VPMBUILDHOST rpmbuild -ta --define "CENT6 1" /tmp/vpostmaster-"$VERSION".tar.gz
+scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
+ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
 for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
    scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum/centos/6/x86-64?
@@ -116,7 +114,7 @@ cd projects/vpostmaster-yum && make sign
 
 #  Build Lucid packages:
 
-   VPMBUILDHOST=10.242.1.199
+   VPMBUILDHOST=zfsbackup2
    REPODIR=ubuntu/lucid
 
    ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
