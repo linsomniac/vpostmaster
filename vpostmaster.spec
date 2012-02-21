@@ -85,7 +85,10 @@ mkdir -p "$RPM_BUILD_ROOT"%{_mandir}/man1/
 install -m 755 vpmsupp.py "$RPM_BUILD_ROOT"/usr/lib/vpostmaster/lib/
 install -m 755 vpm-pfpolicy vpm-pftransport \
       "$RPM_BUILD_ROOT"/usr/lib/vpostmaster/postfix/
-install -m 755 vpm-wwwhelper scripts/setup-fc3 vpmuser vpm-pgmaintain \
+install -m 755 vpm-wwwhelper \
+      scripts/setup-rhel6 \
+      scripts/setup-fc3 \
+      vpmuser vpm-pgmaintain \
       vpm-dbupgrade vpm-backup scripts/vpm-cpvpopmail \
       scripts/vpm-restartsasl scripts/setup-mailman \
       "$RPM_BUILD_ROOT"/usr/lib/vpostmaster/bin/

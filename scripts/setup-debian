@@ -634,4 +634,4 @@ fi
 
 #  set up mailman paths
 [ -x /usr/lib/vpostmaster/bin/setup-mailman ] && \
-		/usr/lib/vpostmaster/bin/setup-mailman
+		su postgres -c /usr/lib/vpostmaster/bin/setup-mailman

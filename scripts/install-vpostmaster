@@ -31,6 +31,7 @@ function vpm_remove_mail_servers_rpm
 function vpm_firewall_setup_rpm
 {
    /sbin/iptables -I INPUT -m tcp -p tcp --dport 25 -j ACCEPT
+   /sbin/iptables -I INPUT -m tcp -p tcp --dport 587 -j ACCEPT
    /sbin/iptables -I INPUT -m tcp -p tcp --dport 110 -j ACCEPT
    /sbin/iptables -I INPUT -m tcp -p tcp --dport 143 -j ACCEPT
    /sbin/iptables -I INPUT -m tcp -p tcp --dport 993 -j ACCEPT
@@ -170,7 +171,9 @@ then
          && OSTYPE=CentOS-4 && METHOD=yum
    grep -q 'CentOS release 5' /etc/redhat-release \
          && OSTYPE=CentOS-5 && METHOD=yum
-   grep -q 'CentOS Linux release 6' /etc/redhat-release \
+   grep -q 'CentOS release 6' /etc/redhat-release \
+         && OSTYPE=CentOS-6 && METHOD=yum
+   grep -q 'Scientific Linux release 6' /etc/redhat-release \
          && OSTYPE=CentOS-6 && METHOD=yum
    egrep -q 'Red Hat Enterprise [[:alpha:] ]*4 ' /etc/redhat-release \
          && OSTYPE=RHEL-4 && METHOD=up2date
@@ -241,11 +244,11 @@ case "$METHOD" in
 
          echo "*** Setting up EPEL repository..."
          if [ "${OSTYPE##*-}" -eq 4 ]; then
-            rpm -Uvh http://download.fedora.redhat.com/pub/epel/4/`uname -i`/epel-release-4-9.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/4/`uname -i`/epel-release-4-9.noarch.rpm
          elif [ "${OSTYPE##*-}" -eq 5 ]; then
-            rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/`uname -i`/epel-release-5-3.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/`uname -i`/epel-release-5-3.noarch.rpm
          elif [ "${OSTYPE##*-}" -eq 6 ]; then
-            rpm -Uvh http://download.fedora.redhat.com/pub/epel/6/`uname -i`/epel-release-6-5.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/`uname -i`/epel-release-6-5.noarch.rpm
          fi
       fi
 
@@ -257,7 +260,7 @@ case "$METHOD" in
          for FILE in \
                /usr/share/doc/centos-release-*/RPM-GPG-KEY-centos* \
                /usr/share/doc/centos-release-*/RPM-GPG-KEY \
-               http://download.fedora.redhat.com/pub/epel/RPM-GPG-KEY-EPEL
+               http://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL
          do
             [ -f "$FILE" ] || continue
             rpm --import "$FILE"
@@ -280,10 +283,13 @@ case "$METHOD" in
       [ -f /etc/freshclam.conf ] && \
             sed -i 's/^Example/#Example/' /etc/freshclam.conf
 
-      #  scripts/setup-fc3
+      #  invoke setup script
       echo "*** Performing post-install setup..."
       echo "+++ See /var/log/setup-vpostmaster.out for details."
-      /usr/lib/vpostmaster/bin/setup-fc3 >/var/log/setup-vpostmaster.out 2>&1
+      SETUP_SCRIPT=setup-fc3
+      [ "$OSTYPE" == CentOS-6 ] && SETUP_SCRIPT=setup-rhel6
+      /usr/lib/vpostmaster/bin/"$SETUP_SCRIPT" \
+            >/var/log/setup-vpostmaster.out 2>&1
 
       #  fix firewall
       echo "*** Opening firewall for mail server..."

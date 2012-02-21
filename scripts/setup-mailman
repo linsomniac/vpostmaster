@@ -4,8 +4,6 @@
 #
 #  Set mailman locations in the meta table.
 
-dbConnect = 'dbname=vpostmaster'
-
 import string, sys, os, syslog
 sys.path.append('/usr/lib/vpostmaster/lib')
 import vpmsupp
@@ -15,9 +13,8 @@ force = 0
 if len(sys.argv) > 1 and sys.argv[1] == '--force': force = 1
 
 #  connect to database
-dbConnect = vpmsupp.getConnectStr(
-                '/usr/lib/vpostmaster/etc/wwwdb.conf')
-connection = vpmsupp.connectToDb(dbConnect)
+#  *NOTE* This needs to use local authentication, not the vPostMaster accounts
+connection = vpmsupp.connectToDb('dbname=vpostmaster')
 cursor = connection.cursor()
 
 #  set the values

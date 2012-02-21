@@ -1,16 +1,23 @@
-#!/bin/sh
+#!/bin/bash
 #
 # (c) 2005-2012 tummy.com, ltd.
 #
 #  Set up vPostMaster on the system, including the database and config
-#  files.  For Fedora-based systems including RHEL and CentOS.
+#  files.  For CentOS 6 systems.
 
 PATH=$PATH:/usr/sbin:/sbin
+
+DOVECOT_SQL_CONF=/etc/dovecot/dovecot-sql.conf.ext
 
 
 #  create passwords
 function genpasswd {
-head -c 32 /dev/urandom | md5sum | awk '{ print $1 }'
+PW=`( head -c 32 /dev/urandom | base64 | sed 's/[^A-Za-z0-9]//g' ) 2>/dev/null`
+if [ -z "$PW" ]; then
+	head -c 32 /dev/urandom | md5sum | awk '{ print $1 }'
+else
+	echo "$PW"
+fi
 }
 function cryptpasswd {
 python -c "import crypt; print crypt.crypt('$1', '$2')"
@@ -25,6 +32,17 @@ PASSWORD_IMAPSERVER=`genpasswd`
 PASSWORD_SUPERUSER=`genpasswd | cut -c 1-8`
 SALT=`genpasswd | cut -c 1-2`
 CRYPTED_SUPERUSER=`cryptpasswd "$PASSWORD_SUPERUSER" "$SALT"`
+
+#  create database
+if [ ! -d /var/lib/pgsql/data/base ]; then
+	/etc/init.d/postgresql initdb
+	/etc/init.d/postgresql restart
+fi
+if [ ! -d /var/lib/pgsql/data/base ]; then
+	echo 'Initial database directory "/var/lib/pgsql/data/base" does not exist.'
+	echo 'Aborting.'
+	exit 1
+fi
 
 #  move wwwdb.conf out of the way if it's the distribution copy
 head -1 /usr/lib/vpostmaster/etc/wwwdb.conf 2>/dev/null \
@@ -71,7 +89,7 @@ fi
 if [ -f /etc/dovecot-pgsql.conf ]
 then
 	PASSWORD_IMAPSERVER=`awk -F '=' \
-	'/^connect/ { print $6 }' /etc/dovecot-pgsql.conf`
+			'/^connect/ { print $6 }' "$DOVECOT_SQL_CONF"`
 fi
 
 if [ -f /etc/postfix/vpm-domains ]
@@ -80,36 +98,30 @@ then
 			/etc/postfix/vpm-domains`
 fi
 
-#  figure out dovecot version
-DOVECOTVER=`rpm -q --queryformat '%{version}' dovecot`
-DOVECOTVER="${DOVECOTVER%%.*}"
-
 VPOSTMASTER_UID=`grep '^vpostmaster:' /etc/passwd | awk -F: '{ print $3 }'`
 VPOSTMASTER_GID=`grep '^vpostmaster:' /etc/passwd | awk -F: '{ print $4 }'`
+
+#  CentOS 6 needs dovecot-pgsql
+yum -y install dovecot-pgsql
 (  # run following commands in umasked subshell for added password security
 	umask 077
-	if [ ! -f /etc/dovecot-pgsql.conf ]
+	if [ ! -f "$DOVECOT_SQL_CONF" ]
 	then
-		if [ "$DOVECOTVER" -ge 1 ]
-		then
-			echo "driver = pgsql" >/etc/dovecot-pgsql.conf
-		else
-			:>/etc/dovecot-pgsql.conf
-		fi
+		echo "driver = pgsql" >"$DOVECOT_SQL_CONF"
 		echo "connect = host=localhost dbname=vpostmaster user=imapserver" \
-	  			" password=$PASSWORD_IMAPSERVER" >>/etc/dovecot-pgsql.conf
-		echo "default_pass_scheme = CRYPT" >>/etc/dovecot-pgsql.conf
+	  			" password=$PASSWORD_IMAPSERVER" >>"$DOVECOT_SQL_CONF"
+		echo "default_pass_scheme = CRYPT" >>"$DOVECOT_SQL_CONF"
 		echo "password_query = SELECT users.cryptedpasswd AS password " \
 				"FROM users WHERE users.name = '%n' AND users.domainsname = '%d'" \
 				"AND users.active = 't' AND (SELECT active FROM domains" \
-				"WHERE name = '%d') = 't'" >>/etc/dovecot-pgsql.conf
+				"WHERE name = '%d') = 't'" >>"$DOVECOT_SQL_CONF"
 		echo "user_query = SELECT userdir AS home, $VPOSTMASTER_UID" \
 	  			"AS uid, $VPOSTMASTER_GID AS gid FROM users" \
 				"WHERE users.name = '%n' AND users.domainsname = '%d'" \
 				"AND users.active = 't' AND (SELECT active FROM domains" \
-				"WHERE name = '%d') = 't'" >>/etc/dovecot-pgsql.conf
-		chown root /etc/dovecot-pgsql.conf
-		chmod 400 /etc/dovecot-pgsql.conf
+				"WHERE name = '%d') = 't'" >>"$DOVECOT_SQL_CONF"
+		chown root "$DOVECOT_SQL_CONF"
+		chmod 400 "$DOVECOT_SQL_CONF"
 	fi
 
 	#  postfix SQL integration
@@ -136,25 +148,13 @@ then
 fi
 
 #  reconfigure postgres to allow local TCP access
-PGVER=`rpm -q --queryformat '%{version}' postgresql`
-PGVER="${PGVER%%.*}"
-HOSTLINE='host all all 127.0.0.1 255.255.255.255 password'
-if [ "$PGVER" -le 7 -o -z "$PGVER" ]
+HOSTLINE='host all all 127.0.0.1/32 md5'
+if ! grep -q "^listen_addresses = '127.0.0.1'" \
+		/var/lib/pgsql/data/postgresql.conf
 then
-	if ! grep -q '^tcpip_socket = true' /var/lib/pgsql/data/postgresql.conf
-	then
-		bkup /var/lib/pgsql/data/postgresql.conf
-		echo "tcpip_socket = true" >> /var/lib/pgsql/data/postgresql.conf
-	fi
-else
-	HOSTLINE='host all all 127.0.0.1/32 md5'
-	if ! grep -q "^listen_addresses = '127.0.0.1'" \
-			/var/lib/pgsql/data/postgresql.conf
-	then
-		bkup /var/lib/pgsql/data/postgresql.conf
-		echo "listen_addresses = '127.0.0.1'" \
-				>> /var/lib/pgsql/data/postgresql.conf
-	fi
+	bkup /var/lib/pgsql/data/postgresql.conf
+	echo "listen_addresses = '127.0.0.1'" \
+			>> /var/lib/pgsql/data/postgresql.conf
 fi
 if ! grep -q '^'"$HOSTLINE" /var/lib/pgsql/data/pg_hba.conf
 then
@@ -181,32 +181,18 @@ do
 done
 
 # create users
-RARG=""
-createuser -? 2>&1 | grep -q no-createrole && RARG=-R
-su postgres -c "cd /tmp; createuser $RARG -A -D -q postfix"
-su postgres -c "cd /tmp; createuser $RARG -A -D -q vpostmaster"
-su postgres -c "cd /tmp; createuser $RARG -A -D -q vpostmasterwww"
-su postgres -c "cd /tmp; createuser $RARG -A -D -q imapserver"
+for PG_USERNAME in postfix vpostmaster vpostmasterwww imapserver; do
+	su postgres -c "cd /tmp; createuser -R -D -A -S $PG_USERNAME"
+done
 
-#  initialize postgres if needed
+#  load schema if needed
 DBEXIST=`su postgres -c \
 		"cd /tmp; psql -d vpostmaster -At -c 'SELECT count(*) FROM meta'" \
 				2>/dev/null`
 if [ "$DBEXIST" != 1 ]
 then
 	#  load schema
-	SCHEMAFILE=/usr/share/doc/vpostmaster-*/schema.sql
-	if [ ! -f "$SCHEMAFILE" -a -f schema.sql ]
-	then
-		SCHEMAFILE=`mktemp -tp /var/tmp schema.XXXXXXXXXX`
-		if [ -z "$SCHEMAFILE" ]
-		then
-			echo "Cannot create tempfile"
-			exit 1
-		fi
-		cp schema.sql "${SCHEMAFILE}"
-	fi
-	chown postgres "${SCHEMAFILE}"
+	SCHEMAFILE=`rpm -ql vpostmaster | grep schema.sql`
 	su postgres -c "cd /tmp; sh ${SCHEMAFILE}"
 fi
 
@@ -306,6 +292,8 @@ vpm-pftransport_destination_recipient_limit = 1
 virtual_mailbox_domains = $VMB_DOMAINS_MAP
 smtpd_sasl_auth_enable = yes
 smtpd_sasl_application_name = smtpd
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/auth
 broken_sasl_auth_clients = yes
 #always_bcc = archive_address@example.com
 
@@ -335,6 +323,11 @@ vpm-pfpolicy  unix  -       n       n       -       5       spawn
   user=vpostmaster argv=/usr/lib/vpostmaster/postfix/vpm-pfpolicy
 vpm-pftransport unix  -       n       n       -       5       pipe
     flags=qhu user=vpostmaster argv=/usr/lib/vpostmaster/postfix/vpm-pftransport \$sender \$recipient
+submission inet n       -       n       -       -       smtpd
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
 @EOF
 fi
 chkconfig postfix on
@@ -343,68 +336,43 @@ service postfix restart
 #  set up dovecot
 if ! grep -q 'vPostMaster Configuration' /etc/dovecot.conf
 then
-	bkup "/etc/dovecot.conf"
-	if [ "$DOVECOTVER" -ge 1 ]
-	then
-		cat >/etc/dovecot.conf <<@EOF
+	cat >/etc/dovecot/conf.d/auth-vpostmaster.conf <<@EOF
 #  vPostMaster Configuration
-protocol imap {
-}
+auth_mechanisms = plain
 
-protocol pop3 {
-}
-
-auth default {
-  mechanisms = plain
-  passdb sql {
-     args = /etc/dovecot-pgsql.conf
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0666
+    user = postfix
+    group = postfix
   }
-  userdb sql {
-     args = /etc/dovecot-pgsql.conf
-  }
-  user = root
 }
 
-default_mail_env = maildir:~/Maildir/
-first_valid_uid = 100
-protocols = imap imaps pop3 pop3s
-@EOF
-	else
-		cat >>/etc/dovecot.conf <<@EOF
+passdb {
+   driver = sql
+   args = /etc/dovecot/vpostmaster-pgsql.conf
+}
+userdb {
+   driver = sql
+   args = /etc/dovecot/vpostmaster-pgsql.conf
+}
 
-#  vPostMaster Configuration
-default_mail_env = maildir:~/Maildir/
-auth_userdb = pgsql /etc/dovecot-pgsql.conf
-auth_passdb = pgsql /etc/dovecot-pgsql.conf
+mail_location = maildir:~/Maildir/
 first_valid_uid = 100
-protocols = imap imaps pop3 pop3s
 @EOF
-	fi
+	cat >/etc/dovecot/vpostmaster-pgsql.conf <<@EOF
+driver = pgsql
+connect = host=localhost dbname=vpostmaster user=imapserver password=$PASSWORD_IMAPSERVER
+default_pass_scheme = CRYPT
+password_query = SELECT users.cryptedpasswd AS password FROM users WHERE users.name = '%n' AND users.domainsname = '%d' AND users.active = 't' AND (SELECT active FROM domains WHERE name = '%d') = 't'
+user_query = SELECT userdir AS home, $VPOSTMASTER_UID AS uid, $VPOSTMASTER_GID AS gid FROM users WHERE users.name = '%n' AND users.domainsname = '%d' AND users.active = 't' AND (SELECT active FROM domains WHERE name = '%d') = 't'
+@EOF
 fi
 service dovecot restart
 chkconfig dovecot on
 
 service spamassassin restart
 chkconfig spamassassin on
-
-#  set up saslauthd
-if ! grep -q '#vpostmaster' /etc/sysconfig/saslauthd
-then
-	bkup "/etc/sysconfig/saslauthd"
-	echo >>/etc/sysconfig/saslauthd
-	echo '#vpostmaster' >>/etc/sysconfig/saslauthd
-	echo MECH=rimap >>/etc/sysconfig/saslauthd
-	echo 'FLAGS="-r -O 127.0.0.1"' >>/etc/sysconfig/saslauthd
-fi
-if ! grep -q '#vpostmaster' /usr/lib/sasl2/smtpd.conf
-then
-	bkup "/usr/lib/sasl2/smtpd.conf"
-	echo >>/usr/lib/sasl2/smtpd.conf
-	echo '#vpostmaster' >>/usr/lib/sasl2/smtpd.conf
-	echo 'mech_list: plain login' >>/usr/lib/sasl2/smtpd.conf
-fi
-service saslauthd restart
-chkconfig saslauthd on
 
 #  set up home directory
 if [ ! -d ~vpostmaster/.spamassassin ]
