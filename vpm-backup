@@ -7,9 +7,9 @@
 FILE_LIST="usr/lib/vpostmaster/etc etc/dovecot* etc/postfix*"
 FILE_LIST="$FILE_LIST etc/squirrelmail usr/share/squirrelmail/plugins"
 FILE_LIST="$FILE_LIST var/lib/squirrelmail/data"
-FILE_LIST="$FILE_LIST /usr/lib/sasl2/smtpd.conf"
-FILE_LIST="$FILE_LIST /etc/sysconfig/saslauthd"
-FILE_LIST="$FILE_LIST /etc/default/saslauthd"
+FILE_LIST="$FILE_LIST usr/lib/sasl2/smtpd.conf"
+FILE_LIST="$FILE_LIST etc/sysconfig/saslauthd"
+FILE_LIST="$FILE_LIST etc/default/saslauthd"
 SAVE_DIR=/var/spool/vpostmaster
 DUMP_NAME=vpostmaster-database.sql.bz2
 BKUP_NAME=vpostmaster-configfiles.tar.bz2
@@ -24,14 +24,14 @@ umask 077
 		bzip2 -1 > "$SAVE_DIR/$DUMP_NAME".tmp )
 
 #  Prune out files that don't exist
+cd /
 NEW_FILE_LIST=""
 for FILE in $FILE_LIST; do
 	[ -e /"$FILE" ] && NEW_FILE_LIST="$NEW_FILE_LIST $FILE"
 done
 FILE_LIST="$NEW_FILE_LIST"
 
-( cd / ; tar -cf - $FILE_LIST 2>/dev/null ) \
-		| bzip2 -1 >"$SAVE_DIR/$BKUP_NAME".tmp
+tar -cf - $FILE_LIST 2>/dev/null | bzip2 -1 >"$SAVE_DIR/$BKUP_NAME".tmp
 [ -e "$SAVE_DIR/$DUMP_NAME".tmp ] \
 		&& mv "$SAVE_DIR/$DUMP_NAME".tmp "$SAVE_DIR/$DUMP_NAME" \
 		&& chown vpostmaster:root "$SAVE_DIR/$DUMP_NAME" \

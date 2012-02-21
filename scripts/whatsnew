@@ -4,11 +4,12 @@
 
 FILENAME=WHATSNEW.d/`date +%s`
 
+echo -n "Is this to be marker for a version release? [y/N] "
+read line
+
 touch "$FILENAME"
 git add "$FILENAME"
 
-echo -n "Is this to be marker for a version release? [y/N] "
-read line
 MESSAGE='New WHATSNEW entry.'
 if [ "$line" = y ]
 then

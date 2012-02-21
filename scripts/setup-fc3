@@ -335,6 +335,11 @@ vpm-pfpolicy  unix  -       n       n       -       5       spawn
   user=vpostmaster argv=/usr/lib/vpostmaster/postfix/vpm-pfpolicy
 vpm-pftransport unix  -       n       n       -       5       pipe
     flags=qhu user=vpostmaster argv=/usr/lib/vpostmaster/postfix/vpm-pftransport \$sender \$recipient
+submission inet n       -       n       -       -       smtpd
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
 @EOF
 fi
 chkconfig postfix on
