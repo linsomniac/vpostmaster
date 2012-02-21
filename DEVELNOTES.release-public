@@ -1,11 +1,11 @@
 #  SET THE VERSION
+./scripts/whatsnew
+   Say yes to tag a new release.
+   Enter new version number
 eval `scripts/latestversion`
 
 scripts/newchangelogentry
 
-./scripts/whatsnew
-   Say yes to tag a new release.
-   Enter $VERSION
 git commit -a -m 'Committing debian/changelog and WHATSNEW'
 git push
 cd ../commercial
