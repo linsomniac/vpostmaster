@@ -27,7 +27,6 @@ release "$VERSION" vpostmaster
 
 # Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
 # systems aren't happy with.
-
 scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
 ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
 ssh root@dev cp /tmp/vpostmaster-$VERSION.tar.gz \
@@ -60,7 +59,7 @@ scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
 ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
 for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
-   scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum/centos/6/x86-64?
+   scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum/centos/6/x86_64/
 done
 
 #  Sign the packages
