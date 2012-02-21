@@ -7,12 +7,17 @@ if [ -z "$VERSION" ]; then
    exit 1
 fi
 
-if grep -q -w '\('"$VERSION"'\)' debian/changelog; then
-   echo "ERROR: Version $VERSION already in debian/changelog!"
+CHANGELOGFILE=debian/changelog
+if [ "$VERSION" != "${VERSION#2}" ]; then
+   CHANGELOGFILE=debian/changelog-commercial
+fi
+
+if grep -q -w '\('"$VERSION"'\)' "$CHANGELOGFILE" then
+   echo "ERROR: Version $VERSION already in $CHANGELOGFILE!"
    exit 1
 fi
 
-cat <<@EOF >debian/changelog.new
+cat <<@EOF >"$CHANGELOGFILE".new
 vpostmaster ($VERSION) stable; urgency=low
 
   * New upstream version.  See WHATSNEW.
@@ -20,9 +25,9 @@ vpostmaster ($VERSION) stable; urgency=low
  -- Sean Reifschneider <jafo@tummy.com>  `date "+%a, %d %b %Y %H:%M:%S %z"`
 
 @EOF
-cat debian/changelog >>debian/changelog.new
-cat debian/changelog.new >debian/changelog
-rm -f debian/changelog.new
+cat "$CHANGELOGFILE" >>"$CHANGELOGFILE".new
+cat "$CHANGELOGFILE".new >"$CHANGELOGFILE"
+rm -f "$CHANGELOGFILE".new
 
 echo "======================================"
 echo "GIT DIFF"
