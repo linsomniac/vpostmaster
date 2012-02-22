@@ -161,7 +161,7 @@ cd projects/vpostmaster-yum && make sign
 
 #  RELEASE
 
-cd projects/vpostmaster-yum
+cd ~/projects/vpostmaster-yum
 make install
 echo "$VERSION" | ssh root@dev 'cat >/home/httpd/updates.vpostmaster.com/html/currentversion.txt'
 

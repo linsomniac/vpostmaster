@@ -1,27 +1,32 @@
-VERSION=2.26
-
-vi debian/changelog-commercial
-Add a new entry for this release
-svn commit -m 'Committing debian/changelog-commercial'
-
+#  SET THE VERSION
 ./scripts/whatsnew
    Say yes to tag a new release.
-   Enter $VERSION
-svn commit -m 'New release marker'
-svn update
-svnmerge merge
-svn commit -m 'Merging from public'
+   Enter new version number
+eval `scripts/latestversion`
 
-svn cp -m "$VERSION release" svn+ssh://vcs/var/svn/vpostmaster/commercial/trunk svn+ssh://vcs/var/svn/vpostmaster/commercial/tags/release-$VERSION
+scripts/newchangelogentry
+
+git commit -a -m 'Committing debian/changelog and WHATSNEW'
+git push
+cd ../commercial
+git pull
+git fetch upstream
+git merge upstream/master
+git rm <THE WHATSNEW.D FILE MERGED ABOVE>
+git commit -a -m 'Removing the public release tag file.'
+git push
+cd ../public
+
+git tag -s -m "Release $VERSION" release-"$VERSION"
+git push --tags
 
 cd /tmp
-rm -rf vpostmaster-$VERSION
-release $VERSION vpostmaster-commercial
+rm -rf vpostmaster-${VERSION}*
+release "$VERSION" vpostmaster-commercial
 #  ENTER MY GPG PASS PHRASE
 
-Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
-systems aren't happy with.
-
+# Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
+# systems aren't happy with.
 scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
 ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
 ssh root@dev cp /tmp/vpostmaster-$VERSION.tar.gz \
@@ -33,15 +38,32 @@ for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
    scp root@dev:/usr/src/redhat/"$file" /tmp/
 done
 
-#  RUN TESTING
+#  Clean out repo files for old version
+cd ~/projects/vpostmaster-yum-commercial &&
+   find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
+   for dir in [fc]*/*/*/repodata; do
+      cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
 
-cd ~/projects/vpostmaster-yum-commercial
-for dir in {fedora,centos}/*/*; do
-   rm -f "$dir"/vpostmaster-*.noarch.rpm
-   cp /tmp/vpostmaster-$VERSION-1.noarch.rpm "$dir"/
+#  Build on CentOS 6-32
+VPMBUILDHOST=vpm-cent6-32
+scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
+ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
+for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
+   scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum-commercial/centos/6/i686/
 done
-make sign
-#  ENTER MY GPG PASS PHRASE
+
+#  Build on CentOS 6-64
+VPMBUILDHOST=vpm-cent6-64
+scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
+ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
+for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
+   scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum-commercial/centos/6/x86_64/
+done
+
+#  Sign the packages
+cd projects/vpostmaster-yum-commercial && make sign
 
 #  Build Hardy packages:
 
@@ -91,7 +113,7 @@ make sign
 
 #  Build Lucid packages:
 
-   VPMBUILDHOST=10.242.1.199
+   VPMBUILDHOST=zfsbackup2
    REPODIR=ubuntu/lucid
 
    ssh root@$VPMBUILDHOST "rm -rf vpm-build-$VERSION; mkdir vpm-build-$VERSION"
@@ -114,7 +136,7 @@ make sign
 
 #  Build Debian Lenny packages:
 
-   VPMBUILDHOST=10.242.1.202
+   VPMBUILDHOST=zfsbackup2
    REPODIR=debian/lenny
 
    ssh root@$VPMBUILDHOST "rm -rf vpm-build-$VERSION; mkdir vpm-build-$VERSION"
@@ -135,7 +157,10 @@ make sign
    rm -f Release.gpg
    gpg -abs --default-key=95CCBCFF -o Release.gpg Release
 
+#  RUN TESTING
+
 #  RELEASE
+
 cd ~/projects/vpostmaster-yum-commercial
 make install
 echo "$VERSION" | ssh root@dev 'cat >/home/httpd/updates.vpostmaster.com/html/currentversion-commercial.txt'
