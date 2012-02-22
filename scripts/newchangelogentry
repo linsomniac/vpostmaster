@@ -12,7 +12,7 @@ if [ "$VERSION" != "${VERSION#2}" ]; then
    CHANGELOGFILE=debian/changelog-commercial
 fi
 
-if grep -q -w '\('"$VERSION"'\)' "$CHANGELOGFILE" then
+if grep -q -w '\('"$VERSION"'\)' "$CHANGELOGFILE"; then
    echo "ERROR: Version $VERSION already in $CHANGELOGFILE!"
    exit 1
 fi
