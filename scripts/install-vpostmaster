@@ -244,9 +244,9 @@ case "$METHOD" in
 
          echo "*** Setting up EPEL repository..."
          if [ "${OSTYPE##*-}" -eq 4 ]; then
-            rpm -Uvh http://dl.fedoraproject.org/pub/epel/4/`uname -i`/epel-release-4-9.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/4/`uname -i`/epel-release-4-10.noarch.rpm
          elif [ "${OSTYPE##*-}" -eq 5 ]; then
-            rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/`uname -i`/epel-release-5-3.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/`uname -i`/epel-release-5-4.noarch.rpm
          elif [ "${OSTYPE##*-}" -eq 6 ]; then
             rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/`uname -i`/epel-release-6-5.noarch.rpm
          fi
