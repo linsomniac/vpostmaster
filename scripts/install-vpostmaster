@@ -248,7 +248,7 @@ case "$METHOD" in
          elif [ "${OSTYPE##*-}" -eq 5 ]; then
             rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/`uname -i`/epel-release-5-4.noarch.rpm
          elif [ "${OSTYPE##*-}" -eq 6 ]; then
-            rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/`uname -i`/epel-release-6-5.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/`uname -i`/epel-release-6-7.noarch.rpm
          fi
       fi
 
