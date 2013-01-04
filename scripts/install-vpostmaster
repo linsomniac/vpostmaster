@@ -63,7 +63,7 @@ function add_apt_sources_list
          echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/debian/sarge /" \
             >>/etc/apt/sources.list
          ;;
-      Ubuntu-10.04|Ubuntu-8.04)
+      Ubuntu-12.04|Ubuntu-10.04|Ubuntu-8.04)
          echo "deb http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/ubuntu/$DISTRIB_CODENAME /" \
             >/etc/apt/sources.list.d/vpostmaster.list
          echo "deb-src http://${REPO_USER_STRING}yum1.tummy.com/vpostmaster${REPO_COMMERCIAL_STRING}/ubuntu/$DISTRIB_CODENAME /" \
