@@ -489,7 +489,7 @@ fi
 
 #  set up dovecot
 if [ -d /etc/dovecot/conf.d ]; then
-	apt-get install -y dovecot-pgsql dovecot-sieve
+	apt-get install -y dovecot-pgsql
 	postconf smtpd_sasl_type=dovecot smtpd_sasl_path=private/auth
 	/etc/init.d/postfix restart
 
