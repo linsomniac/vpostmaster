@@ -193,26 +193,9 @@ if [ -f /etc/lsb-release ]
 then
    . /etc/lsb-release
    export DISTRIB_CODENAME
-   case "$DISTRIB_CODENAME" in
-      lucid)
-         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
-         ;;
-      hardy)
-         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
-         ;;
-      edgy)
-         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
-         ;;
-      dapper)
-         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
-         ;;
-      breezy)
-         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
-         ;;
-      breezy)
-         OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
-         ;;
-   esac
+   if [ "$DISTRIB_ID" == Ubuntu ]; then
+      OSTYPE="$DISTRIB_ID-$DISTRIB_RELEASE" && METHOD=apt
+   fi
 fi
 
 #  system-specific code
@@ -244,11 +227,20 @@ case "$METHOD" in
 
          echo "*** Setting up EPEL repository..."
          if [ "${OSTYPE##*-}" -eq 4 ]; then
-            rpm -Uvh http://dl.fedoraproject.org/pub/epel/4/`uname -i`/epel-release-4-10.noarch.rpm
+            MACHINE_TYPE=`uname -i`
+            EPEL_FILENAME=`wget -q -O - http://dl.fedoraproject.org/pub/epel/"${OSTYPE##*-}"/"$MACHINE_TYPE" | grep epel-release | sed --regexp-extended 's/.*"(epel-release-[0-9]-[0-9]+.noarch.rpm)".*/\1/'`
+            [ -z "$EPEL_FILENAME" ] && EPEL_FILENAME=epel-release-4-10.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/"${OSTYPE##*-}"/`uname -i`/"$EPEL_FILENAME"
          elif [ "${OSTYPE##*-}" -eq 5 ]; then
-            rpm -Uvh http://dl.fedoraproject.org/pub/epel/5/`uname -i`/epel-release-5-4.noarch.rpm
+            MACHINE_TYPE=`uname -i`
+            EPEL_FILENAME=`wget -q -O - http://dl.fedoraproject.org/pub/epel/"${OSTYPE##*-}"/"$MACHINE_TYPE" | grep epel-release | sed --regexp-extended 's/.*"(epel-release-[0-9]-[0-9]+.noarch.rpm)".*/\1/'`
+            [ -z "$EPEL_FILENAME" ] && EPEL_FILENAME=epel-release-5-4.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/"${OSTYPE##*-}"/`uname -i`/"$EPEL_FILENAME"
          elif [ "${OSTYPE##*-}" -eq 6 ]; then
-            rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/`uname -i`/epel-release-6-7.noarch.rpm
+            MACHINE_TYPE=`uname -i`
+            EPEL_FILENAME=`wget -q -O - http://dl.fedoraproject.org/pub/epel/"${OSTYPE##*-}"/"$MACHINE_TYPE" | grep epel-release | sed --regexp-extended 's/.*"(epel-release-[0-9]-[0-9]+.noarch.rpm)".*/\1/'`
+            [ -z "$EPEL_FILENAME" ] && EPEL_FILENAME=epel-release-6-8.noarch.rpm
+            rpm -Uvh http://dl.fedoraproject.org/pub/epel/"${OSTYPE##*-}"/`uname -i`/"$EPEL_FILENAME"
          fi
       fi
 
@@ -392,6 +384,9 @@ Press ENTER after you have read the above.
             ;;
          Ubuntu-10.04)
             PGVER=postgresql-8.4
+            ;;
+         Ubuntu-12.04)
+            PGVER=postgresql-9.1
             ;;
       esac
       dpkg -l|egrep 'ii *postgresql-?[0-9\.]* ' >/dev/null 2>&1 && \

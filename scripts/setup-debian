@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# (c) 2005 tummy.com, ltd.
+# (c) 2005-2013 tummy.com, ltd.
 #
 #  Set up vPostMaster on the system, including the database and config
 #  files.
@@ -10,7 +10,9 @@ PATH=$PATH:/usr/sbin:/sbin
 
 #  create passwords
 function genpasswd {
-	head -c 32 /dev/urandom | md5sum | awk '{ print $1 }'
+   PASSWORD=`head -c 32 /dev/urandom | base64 | sed 's/[+=/]//g'`
+	[ -z "$PASSWORD" ] && PASSWORD=`head -c 32 /dev/urandom | md5sum | awk '{ print $1 }'`
+	echo $PASSWORD
 }
 function cryptpasswd {
 	python -c "import crypt; print crypt.crypt('$1', '$2')"
@@ -69,7 +71,11 @@ fi
 #    based on version
 #  NOTE: variable cannot happen inside of a subshell or it won't be
 #    readable later
-DOVECOTVER=`dpkg -p dovecot-common | awk '/^Version/ { print $2 }'`
+if [ -d /usr/share/doc/dovecot-core ]; then
+	DOVECOTVER=`dpkg -p dovecot-core | awk '/^Version/ { print $2 }'`
+else
+	DOVECOTVER=`dpkg -p dovecot-common | awk '/^Version/ { print $2 }'`
+fi
 DOVECOTVER="${DOVECOTVER#[0-9]:}"
 DOVECOTMAJ=`echo "$DOVECOTVER" | awk -F'.' '{ print $1 "." $2 }'`
 case "$DOVECOTMAJ" in
@@ -85,6 +91,10 @@ case "$DOVECOTMAJ" in
 		;;
 	1.2)
 		DOVECOTVER=1.2
+		VPMDCONF=/etc/dovecot/dovecot-vpostmaster.conf
+		;;
+	2.0)
+		DOVECOTVER=2.0
 		VPMDCONF=/etc/dovecot/dovecot-vpostmaster.conf
 		;;
 	*)
@@ -148,35 +158,21 @@ VPOSTMASTER_GID=`awk -F: '/^vpostmaster:/ { print $4 }' /etc/passwd`
 )
 
 #  check for different postgres versions
-if dpkg -l postgresql-8.4 2>/dev/null |grep '^ii' >/dev/null 2>&1
-then
-	PGVER=`dpkg -p postgresql-8.4|awk '/^Version/ { print $2 }'`
-elif dpkg -l postgresql-8.3 2>/dev/null |grep '^ii' >/dev/null 2>&1
-then
-	PGVER=`dpkg -p postgresql-8.3|awk '/^Version/ { print $2 }'`
-elif dpkg -l postgresql-8.2 2>/dev/null |grep '^ii' >/dev/null 2>&1
-then
-	PGVER=`dpkg -p postgresql-8.2|awk '/^Version/ { print $2 }'`
-elif dpkg -l postgresql-8.1|grep '^ii' >/dev/null 2>&1
-then
-	PGVER=`dpkg -p postgresql-8.1 2>/dev/null |awk '/^Version/ { print $2 }'`
-elif dpkg -l postgresql-8.0|grep '^ii' >/dev/null 2>&1
-then
-	PGVER=`dpkg -p postgresql-8.0 2>/dev/null |awk '/^Version/ { print $2 }'`
-elif dpkg -l postgresql-7.4 2>/dev/null |grep '^ii' >/dev/null 2>&1
-then
-	PGVER=`dpkg -p postgresql-7.4|awk '/^Version/ { print $2 }'`
-else
-	PGVER=`dpkg -p postgresql|awk '/^Version/ { print $2 }'`
+PGVER=`dpkg -l | grep -E 'ii +postgresql-[0-9].[0-9] ' | sed --regexp-extended 's/ii +postgresql-([0-9.]+).*/\1/' | head -1`
+if [ -z "$PGVER" ]; then
+	echo "Unable to find PostgreSQL version"
+	exit 1
 fi
-PGVER=${PGVER#*:}
 PGMAJ=${PGVER%%.*}
 PGMIN=`echo "$PGVER"|awk -F'.' '{ print $1 "." $2 }'`
 
 #  set variables based on versions
-if [ -x /etc/init.d/postgresql-"$PGMIN" ]
-then
-	PGINIT=/etc/init.d/postgresql-"$PGMIN"
+if [ -f "/etc/postgresql/$PGMIN/main/pg_hba.conf" ]; then
+	if [ -f /etc/init.d/postgresql-"$PGMIN" ]; then
+		PGINIT=/etc/init.d/postgresql-"$PGMIN"
+	else
+		PGINIT=/etc/init.d/postgresql
+	fi
 	PGBASE=/etc/postgresql/"$PGMIN"/main
 else
 	PGINIT=/etc/init.d/postgresql
@@ -194,7 +190,7 @@ else
 fi
 
 #  set up the PostgreSQL data directory if it is not already
-[ ! -f /var/lib/postgres/data/postgresql.conf ] && $PGINIT restart
+$PGINIT restart
 
 #  adjust postgresql.conf
 if ! grep -q "^$PGLISTEN" $PGBASE/postgresql.conf
@@ -445,7 +441,6 @@ virtual_transport = vpm-pftransport
 vpm-pftransport_destination_recipient_limit = 1
 virtual_mailbox_domains = $VMB_DOMAINS_MAP
 smtpd_sasl_auth_enable = yes
-smtpd_sasl_application_name = smtpd
 broken_sasl_auth_clients = yes
 #always_bcc = archive_address@example.com
 
@@ -493,13 +488,55 @@ fi
 /etc/init.d/postfix restart
 
 #  set up dovecot
-MAINCONF=/etc/dovecot/dovecot.conf
-if ! grep -q 'vPostMaster Configuration' $MAINCONF
-then
-	bkup "$MAINCONF"
-	case "$DOVECOTVER" in
-		1.2)
-			cat >$MAINCONF <<@EOF
+if [ -d /etc/dovecot/conf.d ]; then
+	apt-get install -y dovecot-pgsql dovecot-sieve
+	postconf smtpd_sasl_type=dovecot smtpd_sasl_path=private/auth
+	/etc/init.d/postfix restart
+
+	#  disable PAM logins
+	mv /etc/dovecot/conf.d/auth-system.conf.ext /etc/dovecot/conf.d/auth-system.conf.ext.vpostmaster-disabled
+	touch /etc/dovecot/conf.d/auth-system.conf.ext
+
+	MAINCONF=/etc/dovecot/conf.d/vpostmaster.conf
+	if [ ! -f "$MAINCONF" ]; then
+		cat <<@EOF >"$MAINCONF"
+#  vPostMaster Configuration
+protocol imap {
+}
+
+protocol pop3 {
+  pop3_uidl_format = %08Xu%08Xv
+}
+
+passdb sql {
+   driver = sql
+   args = /etc/dovecot/dovecot-vpostmaster.conf
+}
+userdb sql {
+   driver = sql
+   args = /etc/dovecot/dovecot-vpostmaster.conf
+}
+
+service auth {
+   unix_listener /var/spool/postfix/private/auth {
+      mode = 0660
+      user = postfix
+      group = postfix
+   }
+}
+
+mail_location = maildir:~/Maildir/
+first_valid_uid = 100
+@EOF
+	fi
+else
+	MAINCONF=/etc/dovecot/dovecot.conf
+	if ! grep -q 'vPostMaster Configuration' $MAINCONF
+	then
+		bkup "$MAINCONF"
+		case "$DOVECOTVER" in
+			1.2)
+				cat >$MAINCONF <<@EOF
 #  vPostMaster Configuration
 protocol imap {
 }
@@ -511,10 +548,10 @@ protocol pop3 {
 auth default {
   mechanisms = plain
   passdb sql {
-     args = /etc/dovecot/dovecot-vpostmaster.conf
+	  args = /etc/dovecot/dovecot-vpostmaster.conf
   }
   userdb sql {
-     args = /etc/dovecot/dovecot-vpostmaster.conf
+	  args = /etc/dovecot/dovecot-vpostmaster.conf
   }
   user = root
 }
@@ -523,9 +560,9 @@ mail_location = maildir:~/Maildir/
 first_valid_uid = 100
 protocols = imap imaps pop3 pop3s
 @EOF
-			;;
-		0.99)
-			cat >>$MAINCONF <<@EOF
+				;;
+			0.99)
+				cat >>$MAINCONF <<@EOF
 
 #  vPostMaster Configuration
 default_mail_env = maildir:~/Maildir/
@@ -534,9 +571,9 @@ auth_passdb = pgsql /etc/dovecot-pgsql.conf
 first_valid_uid = 100
 protocols = imap imaps pop3 pop3s
 @EOF
-			;;
-		0.99-special)
-			cat >$MAINCONF <<@EOF
+				;;
+			0.99-special)
+				cat >$MAINCONF <<@EOF
 #  vPostMaster Configuration
 protocol imap {
 }
@@ -555,9 +592,9 @@ default_mail_env = maildir:~/Maildir/
 first_valid_uid = 100
 protocols = imap imaps pop3 pop3s
 @EOF
-			;;
-		*)
-			cat >$MAINCONF <<@EOF
+				;;
+			*)
+				cat >$MAINCONF <<@EOF
 #  vPostMaster Configuration
 protocol imap {
 }
@@ -569,10 +606,10 @@ protocol pop3 {
 auth default {
   mechanisms = plain
   passdb sql {
-     args = /etc/dovecot/dovecot-vpostmaster.conf
+	  args = /etc/dovecot/dovecot-vpostmaster.conf
   }
   userdb sql {
-     args = /etc/dovecot/dovecot-vpostmaster.conf
+	  args = /etc/dovecot/dovecot-vpostmaster.conf
   }
   user = root
 }
@@ -581,8 +618,9 @@ default_mail_env = maildir:~/Maildir/
 first_valid_uid = 100
 protocols = imap imaps pop3 pop3s
 @EOF
-			;;
-	esac
+				;;
+		esac
+	fi
 fi
 
 # setup dovecot user
