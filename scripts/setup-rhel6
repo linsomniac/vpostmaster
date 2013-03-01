@@ -259,6 +259,13 @@ apache       ALL=(root) NOPASSWD: /usr/lib/vpostmaster/bin/vpm-wwwhelper
 			"/usr/lib/mailman/mail/mailman" >>/etc/sudoers
 fi
 
+#  disable SELINUX
+if ! grep -q '^SELINUX=disabled' /etc/sysconfig/selinux; then
+	echo '' >>/etc/sysconfig/selinux
+	echo '#  for vPostMaster' >>/etc/sysconfig/selinux
+	echo 'SELINUX=disabled' >>/etc/sysconfig/selinux
+fi
+
 #  NOTE: Disabled, this blows up pretty spectacularly
 ##  set up SELinux if necessary
 #if [ -f /etc/sysconfig/selinux ] && ! grep -q 'SELINUX=disabled' &&
