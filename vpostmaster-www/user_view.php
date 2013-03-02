@@ -233,7 +233,7 @@
                pg_escape_string($info["password1"]) . "', ";
          if (!$info["password1"]) {
             $setCryptedPw = "";
-            $CryptedPw = "";
+            $cryptedPw = "";
          }
          $result = pg_query("UPDATE users " .
                "SET " .
