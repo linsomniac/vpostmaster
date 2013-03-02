@@ -516,7 +516,6 @@ class checkClass:  #{{{1
 				syslog.syslog(syslog.LOG_DEBUG,
 						'checkGreylist: Transport can ONLY quarantine.')
 			return(( 'DUNNO', '' ))
-		timeout = self.userData.get('greylisttimeoutminutes', 0)
 
 		#  check the RWL
 		addrRev = string.split(self.data['client_address'], '.')

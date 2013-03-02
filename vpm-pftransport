@@ -7,6 +7,7 @@
 dbConnect = 'dbname=vpostmaster'
 
 import string, sys, os, time, syslog, re
+import email.parser
 sys.path.append('/usr/lib/vpostmaster/lib')
 import vpmsupp
 
@@ -280,35 +281,29 @@ def processMessage(cursor, connection, debug = 0):  #{{{1
 	synthetic['message_file'] = tmpFile
 
 	#  process the first received line  {{{2
-	receivedType = 'unknown'
-	for line in string.split(firstBlock, '\n'):
-		if line[:9] != 'Received:': continue
+	headers = email.parser.Parser().parsestr(firstBlock)
+	first_received_line = headers.get('Received', '')
 
-		#  remote receipt  {{{3
-		m = re.match(r'^Received:\s+from\s+(\S+)\s+\((\S+)\s+\[([\d.]+)\]\)\s*$',
-				line)
-		if m:
-			receivedType = 'remote'
-			groups = m.groups()
-			synthetic['helo_name'] = groups[0]
-			synthetic['client_name'] = groups[1]
-			synthetic['client_address'] = groups[2]
-			break
+	#  remote receipt  {{{3
+	m = re.match(r'^from\s+(\S+)\s+\((\S+)\s+\[([\d.]+)\]\)\s*$',
+			first_received_line)
+	if m:
+		groups = m.groups()
+		synthetic['helo_name'] = groups[0]
+		synthetic['client_name'] = groups[1]
+		synthetic['client_address'] = groups[2]
 
-		#  local receipt  {{{3
-		m = re.match(r'^Received:\s+by\s+(\S+)\s+\((Postfix|vPostMaster)(,'
+	if (
+			#  local sender
+			re.match(r'^by\s+(\S+)\s+\((Postfix|vPostMaster)(,'
 				r'\s+from\s+userid\s+\d+\))?\s*$',
-				line)
-		if m:
-			receivedType = 'local'
-			synthetic['helo_name'] = None
-			synthetic['client_name'] = 'localhost'
-			synthetic['client_address'] = '127.0.0.1'
-			break
-
-		#  unknown delivery  {{{3
-		syslog.syslog('Unknown received line: "%s"' % line)
-		break
+				first_received_line)
+			#  sasl authenticated
+			or re.search(r'\(Authenticated sender: ([^)]+)\)',
+				first_received_line)):
+		synthetic['helo_name'] = None
+		synthetic['client_name'] = 'localhost'
+		synthetic['client_address'] = '127.0.0.1'
 
 	#  call checkers  {{{2
 	status, reason, addHeaders = vpmsupp.checkClass(debug = debug).runCheck(
