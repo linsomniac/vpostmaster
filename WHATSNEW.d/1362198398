@@ -1,1 +1,3 @@
 Fixing unset cryptedPw error in user_view.php (Patch by Nataraj)
+      This could result in the user being logged out if the password
+      wasn't changed.
