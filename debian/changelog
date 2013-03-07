@@ -1,3 +1,9 @@
+vpostmaster (1.76) stable; urgency=low
+
+  * New upstream version.  See WHATSNEW.
+
+ -- Sean Reifschneider <jafo@tummy.com>  Wed, 06 Mar 2013 17:39:16 -0700
+
 vpostmaster (1.74) stable; urgency=low
 
   * New upstream version.  See WHATSNEW.
