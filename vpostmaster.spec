@@ -136,7 +136,7 @@ then
 else
    #  upgrade done after initial install
    /sbin/service postfix stop
-   su postgres -c "/usr/lib/vpostmaster/bin/vpm-dbupgrade --force"
+   /usr/lib/vpostmaster/bin/vpm-dbupgrade --force
    /sbin/service postfix start
 
    #  add new sudoers lines

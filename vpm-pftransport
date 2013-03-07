@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 #
-# (c) 2005, 2006 tummy.com, ltd.
+# (c) 2005-2013 tummy.com, ltd.
 #
 #  Postfix transport for delivering vPostMaster messages
 
 dbConnect = 'dbname=vpostmaster'
 
-import string, sys, os, time, syslog, re
-import email.parser
+import string, sys, os, syslog, re
+import rfc822
 sys.path.append('/usr/lib/vpostmaster/lib')
 import vpmsupp
 
@@ -281,11 +281,13 @@ def processMessage(cursor, connection, debug = 0):  #{{{1
 	synthetic['message_file'] = tmpFile
 
 	#  process the first received line  {{{2
-	headers = email.parser.Parser().parsestr(firstBlock)
-	first_received_line = headers.get('Received', '')
+	fp = open(tmpFile, 'r')
+	headers = rfc822.Message(fp)
+	first_received_line = ''.join(headers.getfirstmatchingheader('Received'))
+	fp.close()
 
 	#  remote receipt  {{{3
-	m = re.match(r'^from\s+(\S+)\s+\((\S+)\s+\[([\d.]+)\]\)\s*$',
+	m = re.match(r'^Received: from\s+(\S+)\s+\((\S+)\s+\[([\d.]+)\]\)\s*$',
 			first_received_line)
 	if m:
 		groups = m.groups()
@@ -295,7 +297,7 @@ def processMessage(cursor, connection, debug = 0):  #{{{1
 
 	if (
 			#  local sender
-			re.match(r'^by\s+(\S+)\s+\((Postfix|vPostMaster)(,'
+			re.match(r'^Received: by\s+(\S+)\s+\((Postfix|vPostMaster)(,'
 				r'\s+from\s+userid\s+\d+\))?\s*$',
 				first_received_line)
 			#  sasl authenticated

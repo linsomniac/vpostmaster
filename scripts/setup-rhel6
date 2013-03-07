@@ -198,7 +198,7 @@ fi
 
 #  upgrade the database, apache, postfix, and dovecot should be 
 #  restarted shortly
-su postgres -c "cd /tmp; /usr/lib/vpostmaster/bin/vpm-dbupgrade --force"
+/usr/lib/vpostmaster/bin/vpm-dbupgrade --force
 
 #  get or set superuser password
 if [ -f /usr/lib/vpostmaster/etc/superuser ]

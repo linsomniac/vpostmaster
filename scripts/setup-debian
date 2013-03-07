@@ -300,7 +300,7 @@ grep -q '^mailman:' /etc/passwd && MAILMANUSER=mailman
 
 #  upgrade the database, apache, postfix, and dovecot should be 
 #  restarted shortly
-su postgres -c "cd /tmp; /usr/lib/vpostmaster/bin/vpm-dbupgrade --force"
+/usr/lib/vpostmaster/bin/vpm-dbupgrade --force
 
 #  configure apache for squirrelmail
 if [ -f /etc/squirrelmail/apache.conf ]

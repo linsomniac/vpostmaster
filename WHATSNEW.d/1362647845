@@ -1,0 +1,2 @@
+Fixing Received parsing for systems without "email" module.
+      (Reported by mattias)
