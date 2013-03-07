@@ -44,23 +44,25 @@ cd ~/projects/vpostmaster-yum &&
    for dir in [fc]*/*/*/repodata; do
       cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
 
-#  Build on CentOS 6-32
-VPMBUILDHOST=vpm-cent6-32
+#  Build on CentOS 5
+VPMBUILDHOST=dev
+scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
+ssh root@$VPMBUILDHOST rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
+for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
+      RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
+   scp root@$VPMBUILDHOST:/usr/src/redhat/"$file" ~/projects/vpostmaster-yum/centos/6/i686/
+done
+cp ~/projects/vpostmaster-yum/centos/5/i386/vpostmaster-*.rpm ~/projects/vpostmaster-yum/centos/5/x86_64/
+
+#  Build on CentOS 6
+VPMBUILDHOST=telley
 scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
 ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
 for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
    scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum/centos/6/i686/
 done
-
-#  Build on CentOS 6-64
-VPMBUILDHOST=vpm-cent6-64
-scp /tmp/vpostmaster-"$VERSION".tar.gz root@$VPMBUILDHOST:/tmp/
-ssh root@$VPMBUILDHOST rpmbuild -ta --define '"CENT6 1"' /tmp/vpostmaster-"$VERSION".tar.gz
-for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
-      RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
-   scp root@$VPMBUILDHOST:/root/rpmbuild/"$file" ~/projects/vpostmaster-yum/centos/6/x86_64/
-done
+cp ~/projects/vpostmaster-yum/centos/6/i686/vpostmaster-*.rpm ~/projects/vpostmaster-yum/centos/6/x86_64/
 
 #  Sign the packages
 cd projects/vpostmaster-yum && make sign
@@ -69,29 +71,6 @@ cd projects/vpostmaster-yum && make sign
 
    VPMBUILDHOST=theobromine
    REPODIR=ubuntu/hardy
-
-   ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
-   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
-   ssh root@$VPMBUILDHOST "set -xv;
-      cd vpm-build-$VERSION &&
-      tar xfz vpostmaster-$VERSION.tar.gz &&
-      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
-      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
-      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
-      apt-ftparchive release . >Release &&
-      echo DONE
-      "
-
-   cd ~/projects/vpostmaster-yum/$REPODIR
-   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
-   rm -f vpostmaster-$VERSION.tar*
-   rm -f Release.gpg
-   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
-
-#  Build Dapper packages:
-
-   VPMBUILDHOST=10.242.1.201
-   REPODIR=ubuntu/dapper
 
    ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
    scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
@@ -134,10 +113,10 @@ cd projects/vpostmaster-yum && make sign
    rm -f Release.gpg
    gpg -abs --default-key=95CCBCFF -o Release.gpg Release
 
-#  Build Debian Lenny packages:
+#  Build Precise packages:
 
-   VPMBUILDHOST=10.242.1.202
-   REPODIR=debian/lenny
+   VPMBUILDHOST=vpostmaster-1204
+   REPODIR=ubuntu/precise
 
    ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
    scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
