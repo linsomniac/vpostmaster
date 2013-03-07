@@ -1,0 +1,1 @@
+Debian should not be running db-upgrade as "postgres" user.

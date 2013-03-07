@@ -57,8 +57,7 @@ case "$1" in
                 2>/dev/null`
         /etc/init.d/postfix stop
         if [ "$DBEXIST" = 1 ]; then
-            /bin/su postgres -c \
-                    "/usr/lib/vpostmaster/bin/vpm-dbupgrade --force"
+           /usr/lib/vpostmaster/bin/vpm-dbupgrade --force
         fi
         /etc/init.d/postfix start
         ;;
