@@ -140,6 +140,10 @@ cd projects/vpostmaster-yum && make sign
 
 #  RELEASE
 
+Update ftp.tummy.com
+
+Update /home/httpd/www.tummy.com/software/vpostmaster/releasenotes.html
+
 cd ~/projects/vpostmaster-yum
 make install
 echo "$VERSION" | ssh root@dev 'cat >/home/httpd/updates.vpostmaster.com/html/currentversion.txt'
