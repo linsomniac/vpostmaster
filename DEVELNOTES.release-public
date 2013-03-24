@@ -64,7 +64,7 @@ for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
 done
 cp ~/projects/vpostmaster-yum/centos/6/i686/vpostmaster-*.rpm ~/projects/vpostmaster-yum/centos/6/x86_64/
 
-#  Sign the packages
+#  Sign the RPM packages
 cd projects/vpostmaster-yum && make sign
 
 #  Build Hardy packages:
