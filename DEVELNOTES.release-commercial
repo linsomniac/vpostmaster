@@ -8,14 +8,10 @@ scripts/newchangelogentry
 
 git commit -a -m 'Committing debian/changelog and WHATSNEW'
 git push
-cd ../commercial
 git pull
 git fetch upstream
 git merge upstream/master
-git rm <THE WHATSNEW.D FILE MERGED ABOVE>
-git commit -a -m 'Removing the public release tag file.'
 git push
-cd ../public
 
 git tag -s -m "Release $VERSION" release-"$VERSION"
 git push --tags
@@ -25,8 +21,13 @@ rm -rf vpostmaster-${VERSION}*
 release "$VERSION" vpostmaster-commercial
 #  ENTER MY GPG PASS PHRASE
 
-# Rebuild SRPM on dev because my F12 laptop makes RPMs that newer
-# systems aren't happy with.
+#  Clean out repo files for old version
+cd ~/projects/vpostmaster-yum-commercial &&
+   find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
+   for dir in [fc]*/*/*/repodata; do
+      cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
+
+# Rebuild SRPM on dev
 scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
 ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
 ssh root@dev cp /tmp/vpostmaster-$VERSION.tar.gz \
@@ -37,12 +38,6 @@ for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
    scp root@dev:/usr/src/redhat/"$file" /tmp/
 done
-
-#  Clean out repo files for old version
-cd ~/projects/vpostmaster-yum-commercial &&
-   find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
-   for dir in [fc]*/*/*/repodata; do
-      cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
 
 #  Build on CentOS 5
 VPMBUILDHOST=dev
@@ -131,6 +126,29 @@ cd projects/vpostmaster-yum-commercial && make sign
       "
 
    cd ~/projects/vpostmaster-yum-commercial/$REPODIR
+   scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
+   rm -f vpostmaster-$VERSION.tar*
+   rm -f Release.gpg
+   gpg -abs --default-key=95CCBCFF -o Release.gpg Release
+
+#  Build Precise packages:
+
+   VPMBUILDHOST=vpostmaster-1204
+   REPODIR=ubuntu/precise
+
+   ssh root@$VPMBUILDHOST mkdir vpm-build-$VERSION
+   scp /tmp/vpostmaster-$VERSION.tar.gz root@$VPMBUILDHOST:vpm-build-$VERSION
+   ssh root@$VPMBUILDHOST "set -xv;
+      cd vpm-build-$VERSION &&
+      tar xfz vpostmaster-$VERSION.tar.gz &&
+      cd vpostmaster-$VERSION && debuild -us -uc && cd .. &&
+      dpkg-scanpackages . /dev/null >Packages && gzip -9c <Packages >Packages.gz &&
+      dpkg-scansources . /dev/null >Sources && gzip -9c <Sources >Sources.gz &&
+      apt-ftparchive release . >Release &&
+      echo DONE
+      "
+
+   cd ~/projects/vpostmaster-yum/$REPODIR
    scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
    rm -f vpostmaster-$VERSION.tar*
    rm -f Release.gpg
