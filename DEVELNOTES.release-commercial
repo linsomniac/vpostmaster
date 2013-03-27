@@ -148,7 +148,7 @@ cd projects/vpostmaster-yum-commercial && make sign
       echo DONE
       "
 
-   cd ~/projects/vpostmaster-yum/$REPODIR
+   cd ~/projects/vpostmaster-yum-commercial/$REPODIR
    scp root@$VPMBUILDHOST:vpm-build-$VERSION/* .
    rm -f vpostmaster-$VERSION.tar*
    rm -f Release.gpg
