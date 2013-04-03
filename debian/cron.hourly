@@ -1,5 +1,5 @@
 #!/bin/bash
 [ -x /usr/lib/vpostmaster/bin/vpm-pgmaintain ] && \
-		/bin/su postgres -c /usr/lib/vpostmaster/bin/vpm-pgmaintain
+		/bin/su vpostmaster -c /usr/lib/vpostmaster/bin/vpm-pgmaintain
 [ -x /usr/lib/vpostmaster/bin/vpm-backup ] && \
 		/usr/lib/vpostmaster/bin/vpm-backup

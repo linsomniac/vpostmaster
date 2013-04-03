@@ -98,7 +98,7 @@ install -m 644 vpostmaster-www/*.ico "$RPM_BUILD_ROOT"/var/www/html/vpostmaster/
 install -m 640 wwwdb.conf-dist "$RPM_BUILD_ROOT"/usr/lib/vpostmaster/etc/wwwdb.conf
 cp vpmuser.man "$RPM_BUILD_ROOT"%{_mandir}/man1/vpmuser.1
 mkdir -p "$RPM_BUILD_ROOT"/etc/cron.d
-echo '0 * * * * postgres /usr/lib/vpostmaster/bin/vpm-pgmaintain' \
+echo '0 * * * * vpostmaster /usr/lib/vpostmaster/bin/vpm-pgmaintain' \
       >"$RPM_BUILD_ROOT"/etc/cron.d/vpostmaster
 echo '10 * * * * root /usr/lib/vpostmaster/bin/vpm-backup' \
 		>"$RPM_BUILD_ROOT"/etc/cron.d/vpostmaster-backup
