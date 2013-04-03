@@ -25,12 +25,6 @@ rm -rf vpostmaster-${VERSION}*
 release "$VERSION" vpostmaster
 #  ENTER MY GPG PASS PHRASE
 
-#  Clean out repo files for old version
-cd ~/projects/vpostmaster-yum &&
-   find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
-   for dir in [fc]*/*/*/repodata; do
-      cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
-
 # Rebuild SRPM on dev
 scp vpostmaster-"$VERSION".tar.gz root@dev:/tmp/
 ssh root@dev rpmbuild -ta /tmp/vpostmaster-"$VERSION".tar.gz
@@ -42,6 +36,12 @@ for file in SRPMS/vpostmaster-$VERSION-1.src.rpm \
       RPMS/noarch/vpostmaster-$VERSION-1.noarch.rpm; do
    scp root@dev:/usr/src/redhat/"$file" /tmp/
 done
+
+#  Clean out repo files for old version
+cd ~/projects/vpostmaster-yum &&
+   find [fc]* -type f -name vpostmaster\*.rpm -exec rm '{}' ';' &&
+   for dir in [fc]*/*/*/repodata; do
+      cp /tmp/vpostmaster-$VERSION*.noarch.rpm "$dir"/../; done
 
 #  Build on CentOS 5
 VPMBUILDHOST=dev
