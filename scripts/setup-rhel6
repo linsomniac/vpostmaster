@@ -264,6 +264,7 @@ if ! grep -q '^SELINUX=disabled' /etc/sysconfig/selinux; then
 	echo '' >>/etc/sysconfig/selinux
 	echo '#  for vPostMaster' >>/etc/sysconfig/selinux
 	echo 'SELINUX=disabled' >>/etc/sysconfig/selinux
+	setenforce 0
 fi
 
 #  NOTE: Disabled, this blows up pretty spectacularly
